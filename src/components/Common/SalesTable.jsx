@@ -1,4 +1,14 @@
 const SalesTable = ({ entries, showSalesPerson = true, onEdit = null }) => {
+  // Format date from YYYY-MM-DD to DD-MM-YYYY
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '-';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
+  };
+
   const getStatusBadge = (status) => {
     const badges = {
       Hot: 'bg-red-100 text-red-700',
@@ -54,7 +64,7 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null }) => {
         <tbody>
           {entries.map((entry, index) => (
             <tr key={entry.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
-              <td className="px-3 py-2.5 text-xs text-gray-700 border-b border-r border-gray-200 align-middle whitespace-nowrap">{entry.date}</td>
+              <td className="px-3 py-2.5 text-xs text-gray-700 border-b border-r border-gray-200 align-middle whitespace-nowrap">{formatDate(entry.date)}</td>
               {showSalesPerson && (
                 <td className="px-3 py-2.5 border-b border-r border-gray-200 align-middle">
                   <p className="text-xs font-medium text-gray-800">{entry.salesPersonName}</p>
@@ -73,13 +83,13 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null }) => {
               <td className="px-3 py-2.5 text-xs text-gray-700 border-b border-r border-gray-200 align-middle">{entry.location}</td>
               <td className="px-3 py-2.5 border-b border-r border-gray-200 align-middle text-center">
                 <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${getRequirementBadge(entry.requirement)}`}>
-                  {entry.requirement === 'Real Estate' ? 'RE' : entry.requirement}
+                  {entry.requirement}
                 </span>
               </td>
               <td className="px-3 py-2.5 border-b border-r border-gray-200 align-middle">
                 <p className="text-xs text-gray-600 line-clamp-2 max-w-[160px]" title={entry.remark}>{entry.remark || '-'}</p>
               </td>
-              <td className="px-3 py-2.5 text-xs text-gray-700 border-b border-r border-gray-200 align-middle whitespace-nowrap">{entry.nextFollowUpDate}</td>
+              <td className="px-3 py-2.5 text-xs text-gray-700 border-b border-r border-gray-200 align-middle whitespace-nowrap">{formatDate(entry.nextFollowUpDate)}</td>
               <td className="px-3 py-2.5 border-b border-r border-gray-200 align-middle text-center">
                 <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(entry.queryStatus)}`}>
                   {entry.queryStatus}

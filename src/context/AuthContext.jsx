@@ -4,11 +4,11 @@ const AuthContext = createContext(null);
 
 // Dummy users data
 const users = [
-  { id: 1, username: 'nimit', password: 'admin123', role: 'admin', name: 'Nimit Gupta' },
-  { id: 2, username: 'anchal', password: 'sales123', role: 'salesperson', name: 'Anchal Kumar', branch: 'Delhi' },
-  { id: 3, username: 'sushil', password: 'sales123', role: 'salesperson', name: 'Sushil Kumar', branch: 'Mumbai' },
-  { id: 4, username: 'varun', password: 'sales123', role: 'salesperson', name: 'Varun Arora', branch: 'Delhi' },
-  { id: 5, username: 'manoj', password: 'sales123', role: 'salesperson', name: 'Manoj Gupta', branch: 'Bangalore' },
+  { id: 1, username: 'nimit', password: '123', role: 'admin', name: 'Nimit Gupta' },
+  { id: 2, username: 'anchal', password: '123', role: 'salesperson', name: 'Anchal Kumar', branch: 'Delhi' },
+  { id: 3, username: 'sushil', password: '123', role: 'salesperson', name: 'Sushil Kumar', branch: 'Mumbai' },
+  { id: 4, username: 'varun', password: '123', role: 'salesperson', name: 'Varun Arora', branch: 'Delhi' },
+  { id: 5, username: 'manoj', password: '123', role: 'salesperson', name: 'Manoj Gupta', branch: 'Bangalore' },
 ];
 
 export const AuthProvider = ({ children }) => {
