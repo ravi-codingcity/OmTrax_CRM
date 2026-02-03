@@ -46,7 +46,7 @@ const Login = () => {
           <img src={omtrax_logo} alt="OmTrax Logo" className="h-10 w-auto mx-auto mt-3" />
           <p className="text-gray-500 text-sm">Relocation & HR Management</p>
         </div>
-          <h2 className="text-xl font-semibold text-gray-800 text-center mb-5">Login In</h2>
+          <h2 className="text-xl font-semibold text-red-500 text-center mb-5">CRM Login</h2>
           
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-lg mb-4 text-sm flex items-center">
