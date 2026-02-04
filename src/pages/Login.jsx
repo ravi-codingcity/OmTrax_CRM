@@ -43,10 +43,17 @@ const Login = () => {
         {/* Login Card */}
         <div className="bg-white rounded-xl shadow-lg shadow-gray-200/50 p-6 border border-red-500">
           <div className="text-center mb-6">
-          <img src={omtrax_logo} alt="OmTrax Logo" className="h-10 w-auto mx-auto mt-3" />
+          <img src={omtrax_logo} alt="OmTrax Logo" className="h-10 w-auto mx-auto mt-6" />
           <p className="text-gray-500 text-sm">Relocation & HR Management</p>
         </div>
-          <h2 className="text-xl font-semibold text-red-500 text-center mb-5">CRM Login</h2>
+
+         {/* Colored Accent Bar */}
+          <div className="flex mb-8 rounded-full overflow-hidden h-1">
+            <div className="flex-1 bg-red-500"></div>
+            <div className="flex-1 bg-blue-500"></div>
+            <div className="flex-1 bg-gray-400"></div>
+          </div>
+          <h2 className="text-xl font-semibold text-red-500 text-center mb-2">CRM Login</h2>
           
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-lg mb-4 text-sm flex items-center">
@@ -97,6 +104,22 @@ const Login = () => {
                 'Sign In'
               )}
             </button>
+
+             {/* Links */}
+            <div className="flex items-center justify-between mt-4 text-sm">
+              <div 
+                to="/reset-password" 
+                className="text-blue-600 hover:text-blue-700 hover:underline"
+              >
+                Forgot Password?
+              </div>
+              <div 
+                to="/signup" 
+                className="text-blue-600 hover:text-blue-700 hover:underline"
+              >
+                Create Account
+              </div>
+            </div>
           </form>
         </div>
 
