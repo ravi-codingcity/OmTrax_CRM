@@ -140,6 +140,23 @@ const initialSalesData = [
     nextFollowUpDate: "2026-02-12",
     queryStatus: "Warm",
   },
+  {
+    id: 9,
+    salesPersonName: "Anchal Kumar",
+    salesPersonId: 2,
+    branch: "Delhi",
+    companyName: "Tech Solutions Pvt Ltd",
+    contactPerson: "Suresh Mehta",
+    contactNumber: "9876543210",
+    contactEmail: "suresh@techsolutions.com",
+    date: "2026-01-30",
+    designation: "Manager",
+    requirement: "Relocation",
+    location: "Kolkata",
+    remark: "Interested in relocation services",
+    nextFollowUpDate: "2026-02-20",
+    queryStatus: "Hot",
+  },
 ];
 
 export const SalesProvider = ({ children }) => {
