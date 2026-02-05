@@ -2,6 +2,12 @@ import { createContext, useContext, useState } from "react";
 
 const SalesContext = createContext(null);
 
+// Notification callback - will be set by SalesProvider wrapper
+let notifyFollowUp = null;
+export const setNotifyCallback = (callback) => {
+  notifyFollowUp = callback;
+};
+
 // Dummy sales data
 const initialSalesData = [
   {
@@ -20,6 +26,10 @@ const initialSalesData = [
     remark: "Interested in employee relocation services for 50 employees",
     nextFollowUpDate: "2026-02-05",
     queryStatus: "Hot",
+    followUpHistory: [
+      { id: 1, date: "2026-01-28", remark: "Initial contact made, very interested", nextFollowUpDate: "2026-02-01", addedBy: "Anchal Kumar" },
+      { id: 2, date: "2026-02-01", remark: "Follow-up call, sent proposal", nextFollowUpDate: "2026-02-05", addedBy: "Anchal Kumar" },
+    ],
   },
   {
     id: 2,
@@ -37,6 +47,9 @@ const initialSalesData = [
     remark: "Looking for HR management solutions",
     nextFollowUpDate: "2026-02-06",
     queryStatus: "Warm",
+    followUpHistory: [
+      { id: 1, date: "2026-01-29", remark: "Initial meeting scheduled", nextFollowUpDate: "2026-02-06", addedBy: "Manoj Kumar" },
+    ],
   },
   {
     id: 3,
@@ -54,6 +67,9 @@ const initialSalesData = [
     remark: "Need office space for 100 employees",
     nextFollowUpDate: "2026-02-03",
     queryStatus: "Hot",
+    followUpHistory: [
+      { id: 1, date: "2026-01-30", remark: "Discussed requirements, looking for 5000 sqft", nextFollowUpDate: "2026-02-03", addedBy: "Varun Arora" },
+    ],
   },
   {
     id: 4,
@@ -71,6 +87,7 @@ const initialSalesData = [
     remark: "Bulk relocation for new office",
     nextFollowUpDate: "2026-02-07",
     queryStatus: "Cold",
+    followUpHistory: [],
   },
   {
     id: 5,
@@ -88,6 +105,7 @@ const initialSalesData = [
     remark: "HR outsourcing inquiry",
     nextFollowUpDate: "2026-02-08",
     queryStatus: "Warm",
+    followUpHistory: [],
   },
   {
     id: 6,
@@ -105,6 +123,9 @@ const initialSalesData = [
     remark: "Looking for commercial property",
     nextFollowUpDate: "2026-02-10",
     queryStatus: "Closed",
+    followUpHistory: [
+      { id: 1, date: "2026-02-02", remark: "Property finalized, deal closed!", nextFollowUpDate: "2026-02-10", addedBy: "Varun Arora" },
+    ],
   },
   {
     id: 7,
@@ -122,6 +143,7 @@ const initialSalesData = [
     remark: "Staff relocation for new hospital wing",
     nextFollowUpDate: "2026-02-09",
     queryStatus: "Hot",
+    followUpHistory: [],
   },
   {
     id: 8,
@@ -139,6 +161,7 @@ const initialSalesData = [
     remark: "Need HR management for 200+ employees",
     nextFollowUpDate: "2026-02-12",
     queryStatus: "Warm",
+    followUpHistory: [],
   },
   {
     id: 9,
@@ -156,6 +179,7 @@ const initialSalesData = [
     remark: "Interested in relocation services",
     nextFollowUpDate: "2026-02-20",
     queryStatus: "Hot",
+    followUpHistory: [],
   },
 ];
 
@@ -167,6 +191,7 @@ export const SalesProvider = ({ children }) => {
       ...entry,
       id: Date.now(),
       date: new Date().toISOString().split("T")[0],
+      followUpHistory: [],
     };
     setSalesEntries([newEntry, ...salesEntries]);
     return newEntry;
@@ -174,9 +199,53 @@ export const SalesProvider = ({ children }) => {
 
   const updateSalesEntry = (id, updatedData) => {
     setSalesEntries((prevEntries) => {
-      const updatedEntry = { ...prevEntries.find((e) => e.id === id), ...updatedData, lastUpdated: new Date().toISOString().split("T")[0] };
+      const existingEntry = prevEntries.find((e) => e.id === id);
+      const updatedEntry = { 
+        ...existingEntry, 
+        ...updatedData, 
+        lastUpdated: new Date().toISOString().split("T")[0] 
+      };
       const otherEntries = prevEntries.filter((e) => e.id !== id);
       return [updatedEntry, ...otherEntries];
+    });
+  };
+
+  const addFollowUp = (entryId, followUpData, addedBy, addedByRole = 'salesperson') => {
+    setSalesEntries((prevEntries) => {
+      return prevEntries.map((entry) => {
+        if (entry.id === entryId) {
+          const newFollowUp = {
+            id: Date.now(),
+            date: new Date().toISOString().split("T")[0],
+            remark: followUpData.remark,
+            nextFollowUpDate: followUpData.nextFollowUpDate,
+            status: followUpData.status || entry.queryStatus,
+            addedBy: addedBy,
+          };
+          
+          // Trigger notification for admin when salesperson adds follow-up
+          if (addedByRole === 'salesperson' && notifyFollowUp) {
+            notifyFollowUp({
+              type: 'followup',
+              salesPersonName: addedBy,
+              companyName: entry.companyName,
+              remark: followUpData.remark,
+              nextFollowUpDate: followUpData.nextFollowUpDate,
+              entryId: entryId,
+            });
+          }
+          
+          return {
+            ...entry,
+            remark: followUpData.remark,
+            nextFollowUpDate: followUpData.nextFollowUpDate,
+            queryStatus: followUpData.status || entry.queryStatus,
+            followUpHistory: [...(entry.followUpHistory || []), newFollowUp],
+            lastUpdated: new Date().toISOString().split("T")[0],
+          };
+        }
+        return entry;
+      });
     });
   };
 
@@ -201,10 +270,10 @@ export const SalesProvider = ({ children }) => {
       (e) => e.queryStatus === "Closed",
     ).length;
 
-    const byBranch = {
-      "Branch A": salesEntries.filter((e) => e.branch === "Branch A").length,
-      "Branch B": salesEntries.filter((e) => e.branch === "Branch B").length,
-    };
+    const byBranch = salesEntries.reduce((acc, entry) => {
+      acc[entry.branch] = (acc[entry.branch] || 0) + 1;
+      return acc;
+    }, {});
 
     const byRequirement = {
       Relocation: salesEntries.filter((e) => e.requirement === "Relocation")
@@ -237,6 +306,7 @@ export const SalesProvider = ({ children }) => {
         salesEntries,
         addSalesEntry,
         updateSalesEntry,
+        addFollowUp,
         getEntryById,
         getSalesEntriesByUser,
         getAllSalesEntries,

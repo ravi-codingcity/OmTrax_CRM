@@ -1,4 +1,4 @@
-const SalesTable = ({ entries, showSalesPerson = true, onEdit = null }) => {
+const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFollowUp = null, onAddFollowUp = null }) => {
   // Format date from YYYY-MM-DD to DD-MM-YYYY
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
@@ -50,14 +50,12 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null }) => {
             )}
             <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Company</th>
             <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Contact Person</th>
-            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Phone</th>
-            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Location</th>
-            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Type</th>
+            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Requirement</th>
             <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Remark</th>
-            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Follow-up</th>
+            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Next Follow-up</th>
             <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Status</th>
-            {onEdit && (
-              <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300 w-16">Action</th>
+            {(onEdit || onViewFollowUp || onAddFollowUp) && (
+              <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300 w-28">Actions</th>
             )}
           </tr>
         </thead>
@@ -73,14 +71,15 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null }) => {
               )}
               <td className="px-3 py-2.5 border-b border-r border-gray-200 align-middle">
                 <p className="text-xs font-semibold text-gray-900">{entry.companyName}</p>
+                <p className="text-xs text-gray-500">{entry.location}</p>
               </td>
               <td className="px-3 py-2.5 border-b border-r border-gray-200 align-middle">
                 <p className="text-xs font-medium text-gray-800">{entry.contactPerson}</p>
                 <p className="text-xs text-gray-500">{entry.designation}</p>
                 <p className="text-xs text-blue-600">{entry.contactEmail}</p>
+                 <p className="text-xs text-blue-600">{entry.contactNumber}</p>
               </td>
-              <td className="px-3 py-2.5 text-xs text-gray-700 border-b border-r border-gray-200 align-middle whitespace-nowrap">{entry.contactNumber}</td>
-              <td className="px-3 py-2.5 text-xs text-gray-700 border-b border-r border-gray-200 align-middle">{entry.location}</td>
+          
               <td className="px-3 py-2.5 border-b border-r border-gray-200 align-middle text-center">
                 <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${getRequirementBadge(entry.requirement)}`}>
                   {entry.requirement}
@@ -95,17 +94,49 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null }) => {
                   {entry.queryStatus}
                 </span>
               </td>
-              {onEdit && (
+              {(onEdit || onViewFollowUp || onAddFollowUp) && (
                 <td className="px-3 py-2.5 border-b border-gray-200 align-middle text-center">
-                  <button
-                    onClick={() => onEdit(entry)}
-                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                    title="Edit Entry"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
+                  <div className="flex items-center justify-center gap-1">
+                    {onViewFollowUp && (
+                      <button
+                        onClick={() => onViewFollowUp(entry)}
+                        className="p-1 text-indigo-600 hover:bg-indigo-50 rounded transition-colors relative"
+                        title="View Follow-ups"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        {entry.followUpHistory?.length > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-indigo-500 text-white text-[10px] rounded-full h-3.5 w-3.5 flex items-center justify-center">
+                            {entry.followUpHistory.length}
+                          </span>
+                        )}
+                      </button>
+                    )}
+                    {onAddFollowUp && (
+                      <button
+                        onClick={() => onAddFollowUp(entry)}
+                        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+                        title="Add Follow-up"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+                    )}
+                    {onEdit && (
+                      <button
+                        onClick={() => onEdit(entry)}
+                        className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        title="Edit Entry"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </td>
               )}
             </tr>

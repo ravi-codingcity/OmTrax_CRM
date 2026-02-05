@@ -1,19 +1,35 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import { SalesProvider } from './context/SalesContext';
+import { SalesProvider, setNotifyCallback } from './context/SalesContext';
+import { NotificationProvider, useNotifications } from './context/NotificationContext';
+import { useEffect } from 'react';
 import ProtectedRoute from './components/Common/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/admin/Dashboard';
 import AllSales from './pages/admin/AllSales';
 import Analytics from './pages/admin/Analytics';
+import AdminNewEntry from './pages/admin/AdminNewEntry';
 import NewEntry from './pages/sales/NewEntry';
 import MyEntries from './pages/sales/MyEntries';
 import SalesAnalytics from './pages/sales/SalesAnalytics';
 
+// Component to connect notification context with sales context
+const NotificationConnector = ({ children }) => {
+  const { addNotification } = useNotifications();
+  
+  useEffect(() => {
+    setNotifyCallback(addNotification);
+  }, [addNotification]);
+  
+  return children;
+};
+
 function App() {
   return (
     <AuthProvider>
-      <SalesProvider>
+      <NotificationProvider>
+        <NotificationConnector>
+          <SalesProvider>
         <Router>
           <Routes>
             {/* Public Routes */}
@@ -41,6 +57,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="admin">
                   <Analytics />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/new-entry"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <AdminNewEntry />
                 </ProtectedRoute>
               }
             />
@@ -79,6 +103,8 @@ function App() {
           </Routes>
         </Router>
       </SalesProvider>
+        </NotificationConnector>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

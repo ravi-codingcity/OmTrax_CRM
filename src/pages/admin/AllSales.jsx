@@ -1,10 +1,13 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSales } from '../../context/SalesContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import SalesTable from '../../components/Common/SalesTable';
+import FollowUpModal from '../../components/Common/FollowUpModal';
 
 const AllSales = () => {
-  const { getAllSalesEntries } = useSales();
+  const { getAllSalesEntries, addFollowUp } = useSales();
+  const navigate = useNavigate();
   const allEntries = getAllSalesEntries();
   
   const [filters, setFilters] = useState({
@@ -13,6 +16,9 @@ const AllSales = () => {
     requirement: '',
     branch: '',
   });
+
+  const [selectedEntry, setSelectedEntry] = useState(null);
+  const [modalMode, setModalMode] = useState('view'); // 'view', 'add', 'both'
 
   const filteredEntries = allEntries.filter((entry) => {
     const matchesSearch =
@@ -35,6 +41,19 @@ const AllSales = () => {
     setFilters({ search: '', status: '', requirement: '', branch: '' });
   };
 
+  const handleViewFollowUp = (entry) => {
+    setSelectedEntry(entry);
+    setModalMode('both');
+  };
+
+  const handleAddFollowUp = (entryId, followUpData, addedBy) => {
+    addFollowUp(entryId, followUpData, addedBy, 'admin');
+  };
+
+  const closeModal = () => {
+    setSelectedEntry(null);
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -46,6 +65,15 @@ const AllSales = () => {
               Showing {filteredEntries.length} of {allEntries.length} entries
             </p>
           </div>
+          <button
+            onClick={() => navigate('/admin/new-entry')}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Entry
+          </button>
         </div>
 
         {/* Filters */}
@@ -117,7 +145,21 @@ const AllSales = () => {
         </div>
 
         {/* Sales Table */}
-        <SalesTable entries={filteredEntries} />
+        <SalesTable 
+          entries={filteredEntries} 
+          onViewFollowUp={handleViewFollowUp}
+        />
+
+        {/* Follow-Up Modal */}
+        {selectedEntry && (
+          <FollowUpModal
+            entry={selectedEntry}
+            onClose={closeModal}
+            onAddFollowUp={handleAddFollowUp}
+            mode={modalMode}
+            currentUser={{ name: 'Admin' }}
+          />
+        )}
       </div>
     </MainLayout>
   );
