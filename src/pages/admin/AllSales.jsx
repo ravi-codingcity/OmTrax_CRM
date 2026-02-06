@@ -1,53 +1,96 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSales } from '../../context/SalesContext';
+import { useAuth } from '../../context/AuthContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import SalesTable from '../../components/Common/SalesTable';
 import FollowUpModal from '../../components/Common/FollowUpModal';
 
 const AllSales = () => {
-  const { getAllSalesEntries, addFollowUp } = useSales();
+  const { salesEntries, loading, fetchSalesEntries, addFollowUp } = useSales();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const allEntries = getAllSalesEntries();
+  const [entries, setEntries] = useState([]);
   
-  const [filters, setFilters] = useState({
-    search: '',
-    status: '',
-    requirement: '',
-    branch: '',
-  });
+  // Filter states (consistent with Dashboard)
+  const [searchTerm, setSearchTerm] = useState('');
+  const [salesPersonFilter, setSalesPersonFilter] = useState('');
+  const [branchFilter, setBranchFilter] = useState('');
+  const [requirementFilter, setRequirementFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const [selectedEntry, setSelectedEntry] = useState(null);
-  const [modalMode, setModalMode] = useState('view'); // 'view', 'add', 'both'
+  const [modalMode, setModalMode] = useState('both');
 
-  const filteredEntries = allEntries.filter((entry) => {
-    const matchesSearch =
-      entry.companyName.toLowerCase().includes(filters.search.toLowerCase()) ||
-      entry.contactPerson.toLowerCase().includes(filters.search.toLowerCase()) ||
-      entry.salesPersonName.toLowerCase().includes(filters.search.toLowerCase());
-    
-    const matchesStatus = !filters.status || entry.queryStatus === filters.status;
-    const matchesRequirement = !filters.requirement || entry.requirement === filters.requirement;
-    const matchesBranch = !filters.branch || entry.branch === filters.branch;
+  // Load data on mount
+  const loadData = useCallback(async () => {
+    await fetchSalesEntries();
+  }, [fetchSalesEntries]);
 
-    return matchesSearch && matchesStatus && matchesRequirement && matchesBranch;
-  });
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  const handleFilterChange = (key, value) => {
-    setFilters({ ...filters, [key]: value });
-  };
+  // Update local entries when salesEntries changes
+  useEffect(() => {
+    setEntries(salesEntries);
+  }, [salesEntries]);
+
+  // Get unique values for dynamic filters (like Dashboard)
+  const uniqueSalesPersons = useMemo(() => 
+    [...new Set(entries.map(e => e.salesPersonName || e.salesPerson?.name).filter(Boolean))].sort(),
+    [entries]
+  );
+  const uniqueBranches = useMemo(() => 
+    [...new Set(entries.map(e => e.branch).filter(Boolean))].sort(),
+    [entries]
+  );
+  const uniqueRequirements = useMemo(() => 
+    [...new Set(entries.map(e => e.requirement).filter(Boolean))].sort(),
+    [entries]
+  );
+  const uniqueStatuses = useMemo(() => 
+    [...new Set(entries.map(e => e.queryStatus).filter(Boolean))].sort(),
+    [entries]
+  );
+
+  // Filtered entries with useMemo for performance
+  const filteredEntries = useMemo(() => {
+    return entries.filter((entry) => {
+      const salesPersonName = entry.salesPersonName || entry.salesPerson?.name || '';
+      const matchesSearch = searchTerm === '' ||
+        entry.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        entry.contactPerson?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        entry.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        salesPersonName.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesSalesPerson = salesPersonFilter === '' || salesPersonName === salesPersonFilter;
+      const matchesStatus = statusFilter === '' || entry.queryStatus === statusFilter;
+      const matchesRequirement = requirementFilter === '' || entry.requirement === requirementFilter;
+      const matchesBranch = branchFilter === '' || entry.branch === branchFilter;
+
+      return matchesSearch && matchesSalesPerson && matchesStatus && matchesRequirement && matchesBranch;
+    });
+  }, [entries, searchTerm, salesPersonFilter, statusFilter, requirementFilter, branchFilter]);
 
   const clearFilters = () => {
-    setFilters({ search: '', status: '', requirement: '', branch: '' });
+    setSearchTerm('');
+    setSalesPersonFilter('');
+    setBranchFilter('');
+    setRequirementFilter('');
+    setStatusFilter('');
   };
+
+  const hasActiveFilters = searchTerm || salesPersonFilter || branchFilter || requirementFilter || statusFilter;
 
   const handleViewFollowUp = (entry) => {
     setSelectedEntry(entry);
     setModalMode('both');
   };
 
-  const handleAddFollowUp = (entryId, followUpData, addedBy) => {
-    addFollowUp(entryId, followUpData, addedBy, 'admin');
+  const handleAddFollowUp = async (entryId, followUpData) => {
+    await addFollowUp(entryId, followUpData);
+    await fetchSalesEntries(); // Refresh data after adding follow-up
   };
 
   const closeModal = () => {
@@ -62,7 +105,7 @@ const AllSales = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-800">All Sales Entries</h1>
             <p className="text-gray-500 text-sm mt-1">
-              Showing {filteredEntries.length} of {allEntries.length} entries
+              {loading ? 'Loading...' : `Showing ${filteredEntries.length} of ${entries.length} entries`}
             </p>
           </div>
           <button
@@ -76,72 +119,84 @@ const AllSales = () => {
           </button>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Search</label>
+        {/* Filter Controls - Consistent with Dashboard */}
+        <div className="bg-white rounded-lg shadow-sm p-3 border border-gray-100">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Search Bar */}
+            <div className="relative flex-1 min-w-[180px]">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
               <input
                 type="text"
-                placeholder="Search company, contact, or sales person..."
-                value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Search company, contact, location..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
-              <select
-                value={filters.status}
-                onChange={(e) => handleFilterChange('status', e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All Status</option>
-                <option value="Hot">Hot</option>
-                <option value="Warm">Warm</option>
-                <option value="Cold">Cold</option>
-                <option value="Closed">Closed</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Requirement</label>
-              <select
-                value={filters.requirement}
-                onChange={(e) => handleFilterChange('requirement', e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All Types</option>
-                <option value="Relocation">Relocation</option>
-                <option value="HR">HR</option>
-                <option value="Real Estate">Real Estate</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Branch</label>
-              <select
-                value={filters.branch}
-                onChange={(e) => handleFilterChange('branch', e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All Branches</option>
-                <option value="Branch A">Branch A</option>
-                <option value="Branch B">Branch B</option>
-              </select>
-            </div>
-          </div>
-          {(filters.search || filters.status || filters.requirement || filters.branch) && (
-            <div className="mt-3 pt-3 border-t border-gray-100">
+
+            {/* Sales Person Filter */}
+            <select
+              value={salesPersonFilter}
+              onChange={(e) => setSalesPersonFilter(e.target.value)}
+              className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-[120px]"
+            >
+              <option value="">All Sales Persons</option>
+              {uniqueSalesPersons.map((person) => (
+                <option key={person} value={person}>{person}</option>
+              ))}
+            </select>
+
+            {/* Branch Filter */}
+            <select
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value)}
+              className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-[110px]"
+            >
+              <option value="">All Branches</option>
+              {uniqueBranches.map((branch) => (
+                <option key={branch} value={branch}>{branch}</option>
+              ))}
+            </select>
+
+            {/* Requirement Filter */}
+            <select
+              value={requirementFilter}
+              onChange={(e) => setRequirementFilter(e.target.value)}
+              className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-[110px]"
+            >
+              <option value="">All Services</option>
+              {uniqueRequirements.map((req) => (
+                <option key={req} value={req}>{req}</option>
+              ))}
+            </select>
+
+            {/* Status Filter */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-[100px]"
+            >
+              <option value="">All Status</option>
+              {uniqueStatuses.map((status) => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
+
+            {/* Clear Filters */}
+            {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center"
+                className="px-2 py-1.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex items-center"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-                Clear Filters
+                Clear
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Sales Table */}
@@ -157,7 +212,7 @@ const AllSales = () => {
             onClose={closeModal}
             onAddFollowUp={handleAddFollowUp}
             mode={modalMode}
-            currentUser={{ name: 'Admin' }}
+            currentUser={user}
           />
         )}
       </div>

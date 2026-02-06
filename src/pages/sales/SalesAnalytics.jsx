@@ -1,48 +1,104 @@
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSales } from '../../context/SalesContext';
 import MainLayout from '../../components/Layout/MainLayout';
 
 const SalesAnalytics = () => {
   const { user } = useAuth();
-  const { getSalesEntriesByUser } = useSales();
-  const myEntries = getSalesEntriesByUser(user.id);
+  const { salesEntries, loading, fetchSalesEntries } = useSales();
+  const [myEntries, setMyEntries] = useState([]);
 
-  // Calculate stats
-  const stats = {
+  // Load data on mount
+  const loadData = useCallback(async () => {
+    await fetchSalesEntries();
+  }, [fetchSalesEntries]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Filter entries for current user
+  useEffect(() => {
+    if (user && salesEntries.length > 0) {
+      const userEntries = salesEntries.filter(
+        entry => entry.salesPerson === user._id || entry.salesPerson?._id === user._id
+      );
+      setMyEntries(userEntries);
+    }
+  }, [salesEntries, user]);
+
+  // Calculate stats with useMemo for performance
+  const stats = useMemo(() => ({
     total: myEntries.length,
     hot: myEntries.filter((e) => e.queryStatus === 'Hot').length,
     warm: myEntries.filter((e) => e.queryStatus === 'Warm').length,
     cold: myEntries.filter((e) => e.queryStatus === 'Cold').length,
     closed: myEntries.filter((e) => e.queryStatus === 'Closed').length,
-  };
+  }), [myEntries]);
 
-  const conversionRate = stats.total > 0 ? ((stats.closed / stats.total) * 100).toFixed(1) : 0;
+  const conversionRate = useMemo(() => 
+    stats.total > 0 ? ((stats.closed / stats.total) * 100).toFixed(1) : 0,
+    [stats]
+  );
 
-  // By requirement
-  const byRequirement = {
-    Relocation: myEntries.filter((e) => e.requirement === 'Relocation').length,
-    HR: myEntries.filter((e) => e.requirement === 'HR').length,
-    'Real Estate': myEntries.filter((e) => e.requirement === 'Real Estate').length,
-  };
+  // By requirement - dynamic from actual data
+  const byRequirement = useMemo(() => {
+    return myEntries.reduce((acc, entry) => {
+      if (entry.requirement) {
+        acc[entry.requirement] = (acc[entry.requirement] || 0) + 1;
+      }
+      return acc;
+    }, {});
+  }, [myEntries]);
 
   // By location
-  const byLocation = myEntries.reduce((acc, entry) => {
-    acc[entry.location] = (acc[entry.location] || 0) + 1;
-    return acc;
-  }, {});
+  const byLocation = useMemo(() => {
+    return myEntries.reduce((acc, entry) => {
+      if (entry.location) {
+        acc[entry.location] = (acc[entry.location] || 0) + 1;
+      }
+      return acc;
+    }, {});
+  }, [myEntries]);
 
   // Recent activity by date
-  const entriesByDate = myEntries.reduce((acc, entry) => {
-    acc[entry.date] = (acc[entry.date] || 0) + 1;
-    return acc;
-  }, {});
+  const entriesByDate = useMemo(() => {
+    return myEntries.reduce((acc, entry) => {
+      const dateKey = entry.createdAt ? entry.createdAt.split('T')[0] : entry.date;
+      if (dateKey) {
+        acc[dateKey] = (acc[dateKey] || 0) + 1;
+      }
+      return acc;
+    }, {});
+  }, [myEntries]);
 
   // Upcoming follow-ups
-  const today = new Date().toISOString().split('T')[0];
-  const upcomingFollowUps = myEntries
-    .filter((e) => e.nextFollowUpDate >= today && e.queryStatus !== 'Closed')
-    .sort((a, b) => new Date(a.nextFollowUpDate) - new Date(b.nextFollowUpDate))
-    .slice(0, 5);
+  const upcomingFollowUps = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return myEntries
+      .filter((e) => {
+        const followUpDate = e.nextFollowUpDate ? e.nextFollowUpDate.split('T')[0] : '';
+        return followUpDate >= today && e.queryStatus !== 'Closed';
+      })
+      .sort((a, b) => new Date(a.nextFollowUpDate) - new Date(b.nextFollowUpDate))
+      .slice(0, 5);
+  }, [myEntries]);
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <svg className="animate-spin h-8 w-8 mx-auto text-blue-500 mb-2" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p className="text-gray-500">Loading analytics...</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -109,32 +165,38 @@ const SalesAnalytics = () => {
           {/* Service Type Distribution */}
           <div className="bg-white rounded-xl shadow-sm p-5">
             <h3 className="text-sm font-semibold text-gray-800 mb-4">By Service Type</h3>
-            <div className="space-y-3">
-              {Object.entries(byRequirement).map(([req, count]) => {
-                const colors = {
-                  Relocation: { bg: 'bg-purple-500', text: 'text-purple-600' },
-                  HR: { bg: 'bg-indigo-500', text: 'text-indigo-600' },
-                  'Real Estate': { bg: 'bg-teal-500', text: 'text-teal-600' },
-                };
-                const color = colors[req] || { bg: 'bg-gray-500', text: 'text-gray-600' };
-                return (
-                  <div key={req}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-600">{req}</span>
-                      <span className={`font-semibold ${color.text}`}>
-                        {count} {stats.total > 0 && `(${((count / stats.total) * 100).toFixed(0)}%)`}
-                      </span>
+            {Object.keys(byRequirement).length > 0 ? (
+              <div className="space-y-3">
+                {Object.entries(byRequirement).map(([req, count], index) => {
+                  const colorPalette = [
+                    { bg: 'bg-purple-500', text: 'text-purple-600' },
+                    { bg: 'bg-indigo-500', text: 'text-indigo-600' },
+                    { bg: 'bg-teal-500', text: 'text-teal-600' },
+                    { bg: 'bg-pink-500', text: 'text-pink-600' },
+                    { bg: 'bg-cyan-500', text: 'text-cyan-600' },
+                  ];
+                  const color = colorPalette[index % colorPalette.length];
+                  return (
+                    <div key={req}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-600">{req}</span>
+                        <span className={`font-semibold ${color.text}`}>
+                          {count} {stats.total > 0 && `(${((count / stats.total) * 100).toFixed(0)}%)`}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2">
+                        <div
+                          className={`${color.bg} h-2 rounded-full transition-all duration-500`}
+                          style={{ width: stats.total > 0 ? `${(count / stats.total) * 100}%` : '0%' }}
+                        ></div>
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div
-                        className={`${color.bg} h-2 rounded-full transition-all duration-500`}
-                        style={{ width: stats.total > 0 ? `${(count / stats.total) * 100}%` : '0%' }}
-                      ></div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 text-center py-4">No data available</p>
+            )}
           </div>
         </div>
 

@@ -1,176 +1,221 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
+import { notificationAPI } from '../services/api';
 
 const NotificationContext = createContext(null);
 
 export const NotificationProvider = ({ children }) => {
-  const [notifications, setNotifications] = useState(() => {
-    const saved = localStorage.getItem('omtrax_notifications');
-    return saved ? JSON.parse(saved) : [];
-  });
-  
-  const [reminders, setReminders] = useState(() => {
-    const saved = localStorage.getItem('omtrax_reminders');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [notifications, setNotifications] = useState([]);
+  const [reminders, setReminders] = useState([]);
+  const [reminderSummary, setReminderSummary] = useState({ total: 0, overdue: 0, today: 0 });
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(false);
 
-  // Save to localStorage whenever notifications change
-  useEffect(() => {
-    localStorage.setItem('omtrax_notifications', JSON.stringify(notifications));
-  }, [notifications]);
+  // Fetch follow-up reminders from the new endpoint
+  const fetchReminders = useCallback(async () => {
+    try {
+      console.log('Fetching reminders from /notifications/reminders...');
+      const response = await notificationAPI.getReminders();
+      console.log('Reminders API response:', response.data);
 
-  useEffect(() => {
-    localStorage.setItem('omtrax_reminders', JSON.stringify(reminders));
-  }, [reminders]);
+      // Parse response: { success: true, data: [...], summary: {...} }
+      const reminderData = response.data?.data || [];
+      const summary = response.data?.summary || { total: 0, overdue: 0, today: 0 };
 
-  const addNotification = (notification) => {
-    const newNotification = {
-      id: Date.now(),
-      timestamp: new Date().toISOString(),
-      isRead: false,
-      type: 'followup', // 'followup' or 'reminder'
-      ...notification,
-    };
-    setNotifications((prev) => [newNotification, ...prev]);
-  };
-
-  const addReminder = useCallback((reminder) => {
-    // Check if reminder already exists for this entry and date
-    setReminders((prev) => {
-      const exists = prev.some(
-        (r) => r.entryId === reminder.entryId && r.followUpDate === reminder.followUpDate
-      );
-      if (exists) return prev;
-      
-      const newReminder = {
-        id: Date.now() + Math.random(),
-        timestamp: new Date().toISOString(),
-        isRead: false,
-        type: 'reminder',
+      // Add type based on isOverdue flag if not already set
+      // Set createdAt to current time if not provided (for display timestamp)
+      const now = new Date().toISOString();
+      const processedReminders = reminderData.map((reminder) => ({
         ...reminder,
-      };
-      return [newReminder, ...prev];
-    });
+        type: reminder.type || (reminder.isOverdue ? 'overdue' : 'reminder'),
+        followUpDate: reminder.nextFollowUpDate,
+        createdAt: reminder.createdAt || now, // Use current time for display
+        isLocalReminder: false, // These are from backend
+      }));
+
+      console.log('Fetched reminders:', processedReminders.length, 'total (', summary.overdue, 'overdue,', summary.today, 'today)');
+      setReminders(processedReminders);
+      setReminderSummary(summary);
+      return processedReminders;
+    } catch (err) {
+      console.error('Error fetching reminders:', err);
+      console.error('Error response:', err.response?.data);
+      return [];
+    }
   }, []);
 
-  // Generate reminders for due follow-ups
-  const generateReminders = useCallback((salesEntries, currentUser) => {
-    if (!currentUser || !salesEntries) return;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const isAdmin = currentUser.role === 'admin';
-    
-    // Filter entries based on user role
-    const relevantEntries = isAdmin 
-      ? salesEntries 
-      : salesEntries.filter((entry) => entry.salesPersonId === currentUser.id);
-    
-    // Find entries with follow-up due today or overdue
-    relevantEntries.forEach((entry) => {
-      if (entry.nextFollowUpDate && entry.nextFollowUpDate <= today) {
-        addReminder({
-          entryId: entry.id,
-          companyName: entry.companyName,
-          contactPerson: entry.contactPerson,
-          salesPersonName: entry.salesPersonName,
-          salesPersonId: entry.salesPersonId,
-          followUpDate: entry.nextFollowUpDate,
-          isOverdue: entry.nextFollowUpDate < today,
-          forUserId: isAdmin ? 'admin' : currentUser.id,
-        });
+  // Fetch notifications from API
+  const fetchNotifications = useCallback(async (params = {}) => {
+    setLoading(true);
+    try {
+      const response = await notificationAPI.getAll(params);
+      console.log('Notifications API response:', response.data);
+      
+      // Handle different response formats
+      let data = [];
+      if (response.data?.data && Array.isArray(response.data.data)) {
+        data = response.data.data;
+      } else if (response.data?.notifications) {
+        data = response.data.notifications;
+      } else if (Array.isArray(response.data)) {
+        data = response.data;
       }
-    });
-  }, [addReminder]);
+      
+      console.log('Parsed notifications:', data);
+      setNotifications(data);
+      return data;
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+      console.error('Error response:', err.response?.data);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const markAsRead = (notificationId, type = 'notification') => {
-    if (type === 'reminder') {
-      setReminders((prev) =>
-        prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
-      );
-    } else {
+  // Fetch unread count
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const response = await notificationAPI.getUnreadCount();
+      console.log('Unread count API response:', response.data);
+      
+      // Handle different response formats: {data: {unreadCount: 2}} or {unreadCount: 2} or {count: 2}
+      const count = response.data?.data?.unreadCount ?? response.data?.unreadCount ?? response.data?.data?.count ?? response.data?.count ?? 0;
+      console.log('Parsed unread count:', count);
+      setUnreadCount(count);
+      return count;
+    } catch (err) {
+      console.error('Error fetching unread count:', err);
+      console.error('Error response:', err.response?.data);
+      return 0;
+    }
+  }, []);
+
+  // Mark single notification as read
+  const markAsRead = useCallback(async (notificationId) => {
+    try {
+      await notificationAPI.markAsRead(notificationId);
       setNotifications((prev) =>
-        prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
+        prev.map((n) => (n._id === notificationId || n.id === notificationId ? { ...n, isRead: true } : n))
       );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+      return { success: true };
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+      return { success: false };
     }
-  };
+  }, []);
 
-  const markAllAsRead = (currentUser) => {
-    const isAdmin = currentUser?.role === 'admin';
-    
-    // Mark notifications as read (admin only sees follow-up notifications)
-    if (isAdmin) {
+  // Mark all notifications as read
+  const markAllAsRead = useCallback(async () => {
+    try {
+      await notificationAPI.markAllAsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+      return { success: true };
+    } catch (err) {
+      console.error('Error marking all as read:', err);
+      return { success: false };
     }
-    
-    // Mark reminders as read (filtered by user)
-    setReminders((prev) =>
-      prev.map((r) => {
-        if (isAdmin || r.forUserId === currentUser?.id || r.salesPersonId === currentUser?.id) {
-          return { ...r, isRead: true };
-        }
-        return r;
-      })
-    );
-  };
+  }, []);
 
-  const clearNotifications = () => {
-    setNotifications([]);
-    setReminders([]);
-  };
+  // Delete notification
+  const deleteNotification = useCallback(async (notificationId) => {
+    try {
+      await notificationAPI.delete(notificationId);
+      setNotifications((prev) => 
+        prev.filter((n) => n._id !== notificationId && n.id !== notificationId)
+      );
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+      return { success: false };
+    }
+  }, []);
 
-  // Get notifications for current user
-  const getNotificationsForUser = useCallback((currentUser) => {
-    if (!currentUser) return [];
-    
-    const isAdmin = currentUser.role === 'admin';
-    
-    // Admin sees all follow-up notifications from salespersons
-    const userNotifications = isAdmin ? notifications : [];
-    
-    // Filter reminders based on user
-    const userReminders = reminders.filter((r) => {
-      if (isAdmin) return true;
-      return r.forUserId === currentUser.id || r.salesPersonId === currentUser.id;
-    });
-    
-    // Combine and sort by timestamp
-    return [...userNotifications, ...userReminders].sort(
-      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
-    );
+  // Clear all read notifications
+  const clearReadNotifications = useCallback(async () => {
+    try {
+      await notificationAPI.clearRead();
+      setNotifications((prev) => prev.filter((n) => !n.isRead));
+      return { success: true };
+    } catch (err) {
+      console.error('Error clearing read notifications:', err);
+      return { success: false };
+    }
+  }, []);
+
+  // Generate overdue notifications (Admin only)
+  const generateOverdueNotifications = useCallback(async () => {
+    try {
+      await notificationAPI.generateOverdue();
+      await fetchNotifications();
+      await fetchUnreadCount();
+      return { success: true };
+    } catch (err) {
+      console.error('Error generating overdue notifications:', err);
+      return { success: false };
+    }
+  }, [fetchNotifications, fetchUnreadCount]);
+
+  // Get notifications for current user (returns current state)
+  const getNotificationsForUser = useCallback(() => {
+    return notifications;
+  }, [notifications]);
+
+  // Get unread count for current user
+  const getUnreadCount = useCallback(() => {
+    return unreadCount;
+  }, [unreadCount]);
+
+  // Get all notifications including reminders (combined and sorted by date)
+  const getAllNotifications = useCallback(() => {
+    // Combine notifications and reminders, sort by createdAt descending
+    const combined = [...notifications, ...reminders];
+    return combined.sort((a, b) => new Date(b.createdAt || b.nextFollowUpDate) - new Date(a.createdAt || a.nextFollowUpDate));
   }, [notifications, reminders]);
 
-  const getUnreadCount = useCallback((currentUser) => {
-    if (!currentUser) return 0;
-    
-    const isAdmin = currentUser.role === 'admin';
-    
-    const unreadNotifications = isAdmin 
-      ? notifications.filter((n) => !n.isRead).length 
-      : 0;
-    
-    const unreadReminders = reminders.filter((r) => {
-      if (!r.isRead) {
-        if (isAdmin) return true;
-        return r.forUserId === currentUser.id || r.salesPersonId === currentUser.id;
+  // Mark a reminder as read (does not remove from list)
+  const markReminderAsRead = useCallback(async (reminderId) => {
+    try {
+      // Call API to mark as read
+      if (reminderId && !reminderId.startsWith('reminder_')) {
+        await notificationAPI.markAsRead(reminderId);
       }
-      return false;
-    }).length;
-    
-    return unreadNotifications + unreadReminders;
-  }, [notifications, reminders]);
+      // Update local state to mark as read
+      setReminders((prev) =>
+        prev.map((r) => (r._id === reminderId ? { ...r, isRead: true } : r))
+      );
+    } catch (err) {
+      console.error('Error marking reminder as read:', err);
+    }
+  }, []);
+
+  // Get unread reminders count
+  const getUnreadRemindersCount = useCallback(() => {
+    return reminders.filter((r) => !r.isRead).length;
+  }, [reminders]);
 
   return (
     <NotificationContext.Provider
       value={{
         notifications,
         reminders,
-        addNotification,
-        addReminder,
-        generateReminders,
+        reminderSummary,
+        unreadCount,
+        loading,
+        fetchNotifications,
+        fetchUnreadCount,
+        fetchReminders,
         markAsRead,
         markAllAsRead,
-        clearNotifications,
+        deleteNotification,
+        clearReadNotifications,
+        generateOverdueNotifications,
         getNotificationsForUser,
         getUnreadCount,
+        getAllNotifications,
+        markReminderAsRead,
+        getUnreadRemindersCount,
       }}
     >
       {children}

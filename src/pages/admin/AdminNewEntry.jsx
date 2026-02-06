@@ -26,6 +26,7 @@ const AdminNewEntry = () => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -53,28 +54,41 @@ const AdminNewEntry = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
 
     setIsSubmitting(true);
+    setErrorMessage('');
 
-    const entry = {
-      ...formData,
-      salesPersonName: user.name,
-      salesPersonId: user.id,
-      branch: user.branch,
-    };
+    try {
+      const entry = {
+        ...formData,
+        salesPerson: user._id || user.id,  // Required by backend
+        branch: user.branch,
+      };
 
-    addSalesEntry(entry);
-    setSuccessMessage('Sales entry added successfully!');
-    setFormData(initialFormState);
+      console.log('Submitting entry data:', entry); // Debug log
+      const result = await addSalesEntry(entry);
+      
+      if (result.success) {
+        setSuccessMessage('Sales entry added successfully!');
+        setFormData(initialFormState);
+
+        setTimeout(() => {
+          setSuccessMessage('');
+          navigate('/admin/sales');
+        }, 1500);
+      } else {
+        setErrorMessage(result.message || 'Failed to add entry. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error adding entry:', error);
+      console.error('Error response:', error.response?.data); // Debug log
+      setErrorMessage(error.response?.data?.message || 'Failed to add entry. Please try again.');
+    }
+    
     setIsSubmitting(false);
-
-    setTimeout(() => {
-      setSuccessMessage('');
-      navigate('/admin/sales');
-    }, 1500);
   };
 
   const inputClasses = (fieldName) =>
@@ -109,6 +123,16 @@ const AdminNewEntry = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             {successMessage}
+          </div>
+        )}
+
+        {/* Error Message */}
+        {errorMessage && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg mb-4 flex items-center text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {errorMessage}
           </div>
         )}
 

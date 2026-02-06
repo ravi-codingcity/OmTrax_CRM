@@ -1,7 +1,16 @@
 const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFollowUp = null, onAddFollowUp = null }) => {
-  // Format date from YYYY-MM-DD to DD-MM-YYYY
+  // Format date from ISO or YYYY-MM-DD to DD-MM-YYYY
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
+    // Handle ISO date format
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}-${month}-${year}`;
+    }
+    // Fallback for YYYY-MM-DD format
     const parts = dateStr.split('-');
     if (parts.length === 3) {
       return `${parts[2]}-${parts[1]}-${parts[0]}`;
@@ -9,14 +18,38 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
     return dateStr;
   };
 
+  // Get salesperson name from entry (handles both populated and non-populated)
+  const getSalesPersonName = (entry) => {
+    if (entry.salesPersonName) return entry.salesPersonName;
+    if (entry.salesPerson?.name) return entry.salesPerson.name;
+    return 'Unknown';
+  };
+
+  // Get follow-up count
+  const getFollowUpCount = (entry) => {
+    if (entry.followUpHistory?.length) return entry.followUpHistory.length;
+    if (entry.followUps?.length) return entry.followUps.length;
+    return 0;
+  };
+
+  // Capitalize first letter for status display
+  const capitalizeStatus = (status) => {
+    if (!status) return '-';
+    return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+  };
+
   const getStatusBadge = (status) => {
+    const normalizedStatus = capitalizeStatus(status);
     const badges = {
       Hot: 'bg-red-100 text-red-700',
       Warm: 'bg-amber-100 text-amber-700',
       Cold: 'bg-blue-100 text-blue-700',
       Closed: 'bg-green-100 text-green-700',
+      New: 'bg-purple-100 text-purple-700',
+      Active: 'bg-teal-100 text-teal-700',
+      Live: 'bg-emerald-100 text-emerald-700',
     };
-    return badges[status] || 'bg-gray-100 text-gray-700';
+    return badges[normalizedStatus] || 'bg-gray-100 text-gray-700';
   };
 
   const getRequirementBadge = (req) => {
@@ -61,11 +94,11 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
         </thead>
         <tbody>
           {entries.map((entry, index) => (
-            <tr key={entry.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
-              <td className="px-3 py-2.5 text-xs text-gray-700 border-b border-r border-gray-200 align-middle whitespace-nowrap">{formatDate(entry.date)}</td>
+            <tr key={entry._id || entry.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
+              <td className="px-3 py-2.5 text-xs text-gray-700 border-b border-r border-gray-200 align-middle whitespace-nowrap">{formatDate(entry.createdAt || entry.date)}</td>
               {showSalesPerson && (
                 <td className="px-3 py-2.5 border-b border-r border-gray-200 align-middle">
-                  <p className="text-xs font-medium text-gray-800">{entry.salesPersonName}</p>
+                  <p className="text-xs font-medium text-gray-800">{getSalesPersonName(entry)}</p>
                   <p className="text-xs text-gray-500">{entry.branch}</p>
                 </td>
               )}
@@ -91,7 +124,7 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
               <td className="px-3 py-2.5 text-xs text-gray-700 border-b border-r border-gray-200 align-middle whitespace-nowrap">{formatDate(entry.nextFollowUpDate)}</td>
               <td className="px-3 py-2.5 border-b border-r border-gray-200 align-middle text-center">
                 <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(entry.queryStatus)}`}>
-                  {entry.queryStatus}
+                  {capitalizeStatus(entry.queryStatus)}
                 </span>
               </td>
               {(onEdit || onViewFollowUp || onAddFollowUp) && (
@@ -107,9 +140,9 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
                           <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
-                        {entry.followUpHistory?.length > 0 && (
+                        {getFollowUpCount(entry) > 0 && (
                           <span className="absolute -top-1 -right-1 bg-indigo-500 text-white text-[10px] rounded-full h-3.5 w-3.5 flex items-center justify-center">
-                            {entry.followUpHistory.length}
+                            {getFollowUpCount(entry)}
                           </span>
                         )}
                       </button>

@@ -23,6 +23,7 @@ const NewEntry = () => {
   const [formData, setFormData] = useState(initialFormState);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [errors, setErrors] = useState({});
 
   const validateForm = () => {
@@ -66,23 +67,35 @@ const NewEntry = () => {
     if (!validateForm()) return;
 
     setIsSubmitting(true);
+    setErrorMessage("");
 
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      const entry = {
+        ...formData,
+        salesPerson: user._id || user.id,  // Required by backend
+        branch: user.branch,
+      };
 
-    const entry = {
-      ...formData,
-      salesPersonName: user.name,
-      salesPersonId: user.id,
-      branch: user.branch,
-    };
-
-    addSalesEntry(entry);
-    setSuccessMessage("Sales entry added successfully!");
-    setFormData(initialFormState);
+      console.log('Submitting entry data:', entry); // Debug log
+      const result = await addSalesEntry(entry);
+      
+      if (result.success) {
+        setSuccessMessage("Sales entry added successfully!");
+        setFormData(initialFormState);
+      } else {
+        setErrorMessage(result.message || "Failed to add entry. Please try again.");
+      }
+    } catch (error) {
+      console.error('Error adding entry:', error);
+      console.error('Error response:', error.response?.data); // Debug log
+      setErrorMessage(error.response?.data?.message || error.response?.data?.error || "Failed to add entry. Please try again.");
+    }
+    
     setIsSubmitting(false);
-
-    setTimeout(() => setSuccessMessage(""), 3000);
+    setTimeout(() => {
+      setSuccessMessage("");
+      setErrorMessage("");
+    }, 3000);
   };
 
   const inputClasses = (fieldName) =>
@@ -119,6 +132,27 @@ const NewEntry = () => {
               />
             </svg>
             {successMessage}
+          </div>
+        )}
+
+        {/* Error Message */}
+        {errorMessage && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg mb-4 flex items-center text-sm">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4 mr-2"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            {errorMessage}
           </div>
         )}
 

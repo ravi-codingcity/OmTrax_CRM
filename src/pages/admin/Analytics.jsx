@@ -1,19 +1,54 @@
+import { useState, useEffect, useCallback } from 'react';
 import { useSales } from '../../context/SalesContext';
 import MainLayout from '../../components/Layout/MainLayout';
 
 const Analytics = () => {
-  const { getAllSalesEntries, getStats } = useSales();
-  const entries = getAllSalesEntries();
-  const stats = getStats();
+  const { salesEntries, stats, loading, fetchSalesEntries, getStats, getAnalytics } = useSales();
+  const [entries, setEntries] = useState([]);
+  const [analyticsData, setAnalyticsData] = useState(null);
+
+  // Load data on mount
+  const loadData = useCallback(async () => {
+    await fetchSalesEntries();
+    await getStats();
+    const analytics = await getAnalytics();
+    setAnalyticsData(analytics);
+  }, [fetchSalesEntries, getStats, getAnalytics]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Update local entries when salesEntries changes
+  useEffect(() => {
+    setEntries(salesEntries);
+  }, [salesEntries]);
 
   // Calculate conversion rate
-  const conversionRate = stats.total > 0 ? ((stats.closed / stats.total) * 100).toFixed(1) : 0;
+  const conversionRate = stats?.total > 0 ? ((stats.closed / stats.total) * 100).toFixed(1) : (stats?.conversionRate || 0);
 
   // Group by date for trend
   const entriesByDate = entries.reduce((acc, entry) => {
-    acc[entry.date] = (acc[entry.date] || 0) + 1;
+    const dateKey = entry.createdAt ? entry.createdAt.split('T')[0] : entry.date;
+    acc[dateKey] = (acc[dateKey] || 0) + 1;
     return acc;
   }, {});
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <svg className="animate-spin h-8 w-8 mx-auto text-blue-500 mb-2" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p className="text-gray-500">Loading analytics...</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -38,14 +73,14 @@ const Analytics = () => {
                 </svg>
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">{stats.closed} deals closed of {stats.total} leads</p>
+            <p className="text-xs text-gray-500 mt-2">{stats?.closed || 0} deals closed of {stats?.total || 0} leads</p>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase">Hot Leads</p>
-                <p className="text-2xl font-bold text-red-600 mt-1">{stats.hot}</p>
+                <p className="text-2xl font-bold text-red-600 mt-1">{stats?.hot || 0}</p>
               </div>
               <div className="bg-red-100 p-3 rounded-lg">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -53,14 +88,14 @@ const Analytics = () => {
                 </svg>
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">{((stats.hot / stats.total) * 100).toFixed(1)}% of total leads</p>
+            <p className="text-xs text-gray-500 mt-2">{stats?.total ? ((stats.hot / stats.total) * 100).toFixed(1) : 0}% of total leads</p>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase">Active Pipeline</p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">{stats.hot + stats.warm}</p>
+                <p className="text-2xl font-bold text-blue-600 mt-1">{(stats?.hot || 0) + (stats?.warm || 0)}</p>
               </div>
               <div className="bg-blue-100 p-3 rounded-lg">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -74,8 +109,8 @@ const Analytics = () => {
           <div className="bg-white rounded-xl shadow-sm p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-gray-500 uppercase">Total Entries</p>
-                <p className="text-2xl font-bold text-gray-800 mt-1">{stats.total}</p>
+                <p className="text-xs font-medium text-gray-500 uppercase">Total Leads</p>
+                <p className="text-2xl font-bold text-gray-800 mt-1">{stats?.total || 0}</p>
               </div>
               <div className="bg-gray-100 p-3 rounded-lg">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -94,22 +129,22 @@ const Analytics = () => {
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Lead Status Distribution</h3>
             <div className="space-y-4">
               {[
-                { label: 'Hot', value: stats.hot, color: 'bg-red-500' },
-                { label: 'Warm', value: stats.warm, color: 'bg-yellow-500' },
-                { label: 'Cold', value: stats.cold, color: 'bg-blue-500' },
-                { label: 'Closed', value: stats.closed, color: 'bg-green-500' },
+                { label: 'Hot', value: stats?.hot || 0, color: 'bg-red-500' },
+                { label: 'Warm', value: stats?.warm || 0, color: 'bg-yellow-500' },
+                { label: 'Cold', value: stats?.cold || 0, color: 'bg-blue-500' },
+                { label: 'Closed', value: stats?.closed || 0, color: 'bg-green-500' },
               ].map((item) => (
                 <div key={item.label}>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-gray-600">{item.label}</span>
                     <span className="font-medium text-gray-800">
-                      {item.value} ({((item.value / stats.total) * 100).toFixed(1)}%)
+                      {item.value} ({stats?.total ? ((item.value / stats.total) * 100).toFixed(1) : 0}%)
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
                     <div
                       className={`${item.color} h-3 rounded-full transition-all duration-500`}
-                      style={{ width: `${(item.value / stats.total) * 100}%` }}
+                      style={{ width: `${stats?.total ? (item.value / stats.total) * 100 : 0}%` }}
                     ></div>
                   </div>
                 </div>
@@ -121,29 +156,33 @@ const Analytics = () => {
           <div className="bg-white rounded-xl shadow-sm p-5">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Service Type Distribution</h3>
             <div className="space-y-4">
-              {Object.entries(stats.byRequirement).map(([req, count]) => {
-                const colors = {
-                  Relocation: 'bg-purple-500',
-                  HR: 'bg-indigo-500',
-                  'Real Estate': 'bg-teal-500',
-                };
-                return (
-                  <div key={req}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-600">{req}</span>
-                      <span className="font-medium text-gray-800">
-                        {count} ({((count / stats.total) * 100).toFixed(1)}%)
-                      </span>
+              {stats?.byRequirement && Object.keys(stats.byRequirement).length > 0 ? (
+                Object.entries(stats.byRequirement).map(([req, count]) => {
+                  const colors = {
+                    Relocation: 'bg-purple-500',
+                    HR: 'bg-indigo-500',
+                    'Real Estate': 'bg-teal-500',
+                  };
+                  return (
+                    <div key={req}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-600">{req}</span>
+                        <span className="font-medium text-gray-800">
+                          {count} ({stats?.total ? ((count / stats.total) * 100).toFixed(1) : 0}%)
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div
+                          className={`${colors[req] || 'bg-gray-500'} h-3 rounded-full transition-all duration-500`}
+                          style={{ width: `${stats?.total ? (count / stats.total) * 100 : 0}%` }}
+                        ></div>
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div
-                        className={`${colors[req]} h-3 rounded-full transition-all duration-500`}
-                        style={{ width: `${(count / stats.total) * 100}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">No service type data available</p>
+              )}
             </div>
           </div>
 
@@ -151,15 +190,21 @@ const Analytics = () => {
           <div className="bg-white rounded-xl shadow-sm p-5">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Branch Performance</h3>
             <div className="grid grid-cols-2 gap-4">
-              {Object.entries(stats.byBranch).map(([branch, count]) => (
-                <div key={branch} className="bg-gray-50 rounded-lg p-4 text-center">
-                  <p className="text-sm text-gray-600">{branch}</p>
-                  <p className="text-3xl font-bold text-gray-800 mt-1">{count}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {((count / stats.total) * 100).toFixed(1)}% of total
-                  </p>
+              {stats?.byBranch && Object.keys(stats.byBranch).length > 0 ? (
+                Object.entries(stats.byBranch).map(([branch, count]) => (
+                  <div key={branch} className="bg-gray-50 rounded-lg p-4 text-center">
+                    <p className="text-sm text-gray-600">{branch}</p>
+                    <p className="text-3xl font-bold text-gray-800 mt-1">{count}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {stats?.total ? ((count / stats.total) * 100).toFixed(1) : 0}% of total
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-2 text-center py-4">
+                  <p className="text-sm text-gray-500">No branch data available</p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
@@ -167,29 +212,36 @@ const Analytics = () => {
           <div className="bg-white rounded-xl shadow-sm p-5">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Sales Leaderboard</h3>
             <div className="space-y-3">
-              {Object.entries(stats.bySalesPerson)
-                .sort((a, b) => b[1] - a[1])
-                .map(([name, count], index) => (
-                  <div key={name} className="flex items-center space-x-3">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${
-                        index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : index === 2 ? 'bg-orange-400' : 'bg-gray-300'
-                      }`}
-                    >
-                      {index + 1}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-800">{name}</p>
-                      <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+              {stats?.bySalesPerson && Object.keys(stats.bySalesPerson).length > 0 ? (
+                Object.entries(stats.bySalesPerson)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([name, count], index) => {
+                    const maxCount = Math.max(...Object.values(stats.bySalesPerson));
+                    return (
+                      <div key={name} className="flex items-center space-x-3">
                         <div
-                          className="bg-blue-600 h-1.5 rounded-full"
-                          style={{ width: `${(count / Math.max(...Object.values(stats.bySalesPerson))) * 100}%` }}
-                        ></div>
+                          className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${
+                            index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : index === 2 ? 'bg-orange-400' : 'bg-gray-300'
+                          }`}
+                        >
+                          {index + 1}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-800">{name}</p>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                            <div
+                              className="bg-blue-600 h-1.5 rounded-full"
+                              style={{ width: `${maxCount ? (count / maxCount) * 100 : 0}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                        <span className="text-sm font-bold text-gray-800">{count}</span>
                       </div>
-                    </div>
-                    <span className="text-sm font-bold text-gray-800">{count}</span>
-                  </div>
-                ))}
+                    );
+                  })
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">No sales data available</p>
+              )}
             </div>
           </div>
         </div>

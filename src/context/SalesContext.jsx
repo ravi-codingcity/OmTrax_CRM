@@ -1,316 +1,306 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useCallback } from "react";
+import { salesAPI, followUpAPI, dashboardAPI } from "../services/api";
 
 const SalesContext = createContext(null);
 
-// Notification callback - will be set by SalesProvider wrapper
-let notifyFollowUp = null;
-export const setNotifyCallback = (callback) => {
-  notifyFollowUp = callback;
-};
-
-// Dummy sales data
-const initialSalesData = [
-  {
-    id: 1,
-    salesPersonName: "Anchal Kumar",
-    salesPersonId: 2,
-    branch: "Delhi",
-    companyName: "Tech Solutions Pvt Ltd",
-    contactPerson: "Vikram Mehta",
-    contactNumber: "9876543210",
-    contactEmail: "vikram@techsolutions.com",
-    date: "2026-01-28",
-    designation: "HR Manager",
-    requirement: "Relocation",
-    location: "Mumbai",
-    remark: "Interested in employee relocation services for 50 employees",
-    nextFollowUpDate: "2026-02-05",
-    queryStatus: "Hot",
-    followUpHistory: [
-      { id: 1, date: "2026-01-28", remark: "Initial contact made, very interested", nextFollowUpDate: "2026-02-01", addedBy: "Anchal Kumar" },
-      { id: 2, date: "2026-02-01", remark: "Follow-up call, sent proposal", nextFollowUpDate: "2026-02-05", addedBy: "Anchal Kumar" },
-    ],
-  },
-  {
-    id: 2,
-    salesPersonName: "Manoj Kumar",
-    salesPersonId: 3,
-    branch: "Mumbai",
-    companyName: "Global Enterprises",
-    contactPerson: "Anita Roy",
-    contactNumber: "9123456789",
-    contactEmail: "anita@globalent.com",
-    date: "2026-01-29",
-    designation: "CEO",
-    requirement: "HR",
-    location: "Delhi",
-    remark: "Looking for HR management solutions",
-    nextFollowUpDate: "2026-02-06",
-    queryStatus: "Warm",
-    followUpHistory: [
-      { id: 1, date: "2026-01-29", remark: "Initial meeting scheduled", nextFollowUpDate: "2026-02-06", addedBy: "Manoj Kumar" },
-    ],
-  },
-  {
-    id: 3,
-    salesPersonName: "Varun Arora",
-    salesPersonId: 4,
-    branch: "Delhi",
-    companyName: "StartUp Hub",
-    contactPerson: "Karan Singh",
-    contactNumber: "9988776655",
-    contactEmail: "karan@startuphub.io",
-    date: "2026-01-30",
-    designation: "Founder",
-    requirement: "Real Estate",
-    location: "Bangalore",
-    remark: "Need office space for 100 employees",
-    nextFollowUpDate: "2026-02-03",
-    queryStatus: "Hot",
-    followUpHistory: [
-      { id: 1, date: "2026-01-30", remark: "Discussed requirements, looking for 5000 sqft", nextFollowUpDate: "2026-02-03", addedBy: "Varun Arora" },
-    ],
-  },
-  {
-    id: 4,
-    salesPersonName: "Sushil Kumar",
-    salesPersonId: 5,
-    branch: "Bangalore",
-    companyName: "Finance Corp",
-    contactPerson: "Rajesh Kumar",
-    contactNumber: "9876512345",
-    contactEmail: "rajesh@financecorp.com",
-    date: "2026-01-31",
-    designation: "CFO",
-    requirement: "Relocation",
-    location: "Hyderabad",
-    remark: "Bulk relocation for new office",
-    nextFollowUpDate: "2026-02-07",
-    queryStatus: "Cold",
-    followUpHistory: [],
-  },
-  {
-    id: 5,
-    salesPersonName: "Anchal Kumar",
-    salesPersonId: 2,
-    branch: "Delhi",
-    companyName: "Digital Dreams",
-    contactPerson: "Pooja Verma",
-    contactNumber: "9654321098",
-    contactEmail: "pooja@digitaldreams.com",
-    date: "2026-02-01",
-    designation: "Operations Head",
-    requirement: "HR",
-    location: "Pune",
-    remark: "HR outsourcing inquiry",
-    nextFollowUpDate: "2026-02-08",
-    queryStatus: "Warm",
-    followUpHistory: [],
-  },
-  {
-    id: 6,
-    salesPersonName: "Varun Arora",
-    salesPersonId: 4,
-    branch: "Delhi",
-    companyName: "Creative Agency",
-    contactPerson: "Sanjay Nair",
-    contactNumber: "9012345678",
-    contactEmail: "sanjay@creativeagency.in",
-    date: "2026-02-02",
-    designation: "Director",
-    requirement: "Real Estate",
-    location: "Chennai",
-    remark: "Looking for commercial property",
-    nextFollowUpDate: "2026-02-10",
-    queryStatus: "Closed",
-    followUpHistory: [
-      { id: 1, date: "2026-02-02", remark: "Property finalized, deal closed!", nextFollowUpDate: "2026-02-10", addedBy: "Varun Arora" },
-    ],
-  },
-  {
-    id: 7,
-    salesPersonName: "Manoj Kumar",
-    salesPersonId: 3,
-    branch: "Mumbai",
-    companyName: "Healthcare Plus",
-    contactPerson: "Dr. Meera Shah",
-    contactNumber: "9876509876",
-    contactEmail: "meera@healthcareplus.com",
-    date: "2026-02-02",
-    designation: "Medical Director",
-    requirement: "Relocation",
-    location: "Ahmedabad",
-    remark: "Staff relocation for new hospital wing",
-    nextFollowUpDate: "2026-02-09",
-    queryStatus: "Hot",
-    followUpHistory: [],
-  },
-  {
-    id: 8,
-    salesPersonName: "Sushil Kumar",
-    salesPersonId: 5,
-    branch: "Bangalore",
-    companyName: "EduTech Solutions",
-    contactPerson: "Vivek Sharma",
-    contactNumber: "9988112233",
-    contactEmail: "vivek@edutech.com",
-    date: "2026-02-03",
-    designation: "CTO",
-    requirement: "HR",
-    location: "Noida",
-    remark: "Need HR management for 200+ employees",
-    nextFollowUpDate: "2026-02-12",
-    queryStatus: "Warm",
-    followUpHistory: [],
-  },
-  {
-    id: 9,
-    salesPersonName: "Anchal Kumar",
-    salesPersonId: 2,
-    branch: "Delhi",
-    companyName: "Tech Solutions Pvt Ltd",
-    contactPerson: "Suresh Mehta",
-    contactNumber: "9876543210",
-    contactEmail: "suresh@techsolutions.com",
-    date: "2026-01-30",
-    designation: "Manager",
-    requirement: "Relocation",
-    location: "Kolkata",
-    remark: "Interested in relocation services",
-    nextFollowUpDate: "2026-02-20",
-    queryStatus: "Hot",
-    followUpHistory: [],
-  },
-];
-
 export const SalesProvider = ({ children }) => {
-  const [salesEntries, setSalesEntries] = useState(initialSalesData);
+  const [salesEntries, setSalesEntries] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [stats, setStats] = useState({
+    total: 0,
+    hot: 0,
+    warm: 0,
+    cold: 0,
+    closed: 0,
+    active: 0,
+    // Follow-ups
+    todayFollowUps: 0,
+    overdueFollowUps: 0,
+    // Performance
+    conversionRate: 0,
+    monthlyConversions: 0,
+    // Breakdowns
+    byBranch: {},
+    byRequirement: {},
+    bySalesPerson: {},
+  });
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+  });
 
-  const addSalesEntry = (entry) => {
-    const newEntry = {
-      ...entry,
-      id: Date.now(),
-      date: new Date().toISOString().split("T")[0],
-      followUpHistory: [],
-    };
-    setSalesEntries([newEntry, ...salesEntries]);
-    return newEntry;
-  };
+  // Fetch all sales entries with optional filters
+  const fetchSalesEntries = useCallback(async (params = {}) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await salesAPI.getAll(params);
+      const data = response.data.data || response.data;
+      
+      if (Array.isArray(data)) {
+        setSalesEntries(data);
+      } else if (data.entries) {
+        setSalesEntries(data.entries);
+        if (data.pagination) {
+          setPagination(data.pagination);
+        }
+      } else {
+        setSalesEntries([]);
+      }
+      return data;
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to fetch sales entries");
+      console.error("Error fetching sales entries:", err);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const updateSalesEntry = (id, updatedData) => {
-    setSalesEntries((prevEntries) => {
-      const existingEntry = prevEntries.find((e) => e.id === id);
-      const updatedEntry = { 
-        ...existingEntry, 
-        ...updatedData, 
-        lastUpdated: new Date().toISOString().split("T")[0] 
-      };
-      const otherEntries = prevEntries.filter((e) => e.id !== id);
-      return [updatedEntry, ...otherEntries];
-    });
-  };
+  // Get sales entries for a specific user
+  const getSalesEntriesByUser = useCallback(async (userId, params = {}) => {
+    setLoading(true);
+    try {
+      const response = await salesAPI.getAll({ ...params, salesPerson: userId });
+      const data = response.data.data || response.data;
+      const entries = Array.isArray(data) ? data : data.entries || [];
+      setSalesEntries(entries);
+      if (data.pagination) {
+        setPagination(data.pagination);
+      }
+      return entries;
+    } catch (err) {
+      console.error("Error fetching user sales entries:", err);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const addFollowUp = (entryId, followUpData, addedBy, addedByRole = 'salesperson') => {
-    setSalesEntries((prevEntries) => {
-      return prevEntries.map((entry) => {
-        if (entry.id === entryId) {
-          const newFollowUp = {
-            id: Date.now(),
-            date: new Date().toISOString().split("T")[0],
-            remark: followUpData.remark,
-            nextFollowUpDate: followUpData.nextFollowUpDate,
-            status: followUpData.status || entry.queryStatus,
-            addedBy: addedBy,
-          };
-          
-          // Trigger notification for admin when salesperson adds follow-up
-          if (addedByRole === 'salesperson' && notifyFollowUp) {
-            notifyFollowUp({
-              type: 'followup',
-              salesPersonName: addedBy,
-              companyName: entry.companyName,
+  // Get single entry by ID
+  const getEntryById = useCallback(async (id) => {
+    try {
+      const response = await salesAPI.getById(id);
+      return response.data.data || response.data;
+    } catch (err) {
+      console.error("Error fetching entry:", err);
+      return null;
+    }
+  }, []);
+
+  // Add new sales entry
+  const addSalesEntry = useCallback(async (entryData) => {
+    setLoading(true);
+    try {
+      const response = await salesAPI.create(entryData);
+      const newEntry = response.data.data || response.data;
+      setSalesEntries((prev) => [newEntry, ...prev]);
+      return { success: true, data: newEntry };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to add sales entry";
+      return { success: false, message };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Update sales entry
+  const updateSalesEntry = useCallback(async (id, updatedData) => {
+    setLoading(true);
+    try {
+      const response = await salesAPI.update(id, updatedData);
+      const updatedEntry = response.data.data || response.data;
+      setSalesEntries((prev) =>
+        prev.map((entry) => (entry._id === id || entry.id === id ? updatedEntry : entry))
+      );
+      return { success: true, data: updatedEntry };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to update sales entry";
+      return { success: false, message };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Delete sales entry (Admin only)
+  const deleteSalesEntry = useCallback(async (id) => {
+    try {
+      await salesAPI.delete(id);
+      setSalesEntries((prev) => prev.filter((entry) => entry._id !== id && entry.id !== id));
+      return { success: true };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to delete sales entry";
+      return { success: false, message };
+    }
+  }, []);
+
+  // Add follow-up to a sales entry
+  const addFollowUp = useCallback(async (salesEntryId, followUpData) => {
+    try {
+      const response = await followUpAPI.create({
+        salesEntryId: salesEntryId,  // Changed from 'salesEntry' to 'salesEntryId'
+        ...followUpData,
+      });
+      const newFollowUp = response.data.data || response.data;
+      
+      // Update the local entry with new follow-up
+      setSalesEntries((prev) =>
+        prev.map((entry) => {
+          if (entry._id === salesEntryId || entry.id === salesEntryId) {
+            return {
+              ...entry,
               remark: followUpData.remark,
               nextFollowUpDate: followUpData.nextFollowUpDate,
-              entryId: entryId,
-            });
+              queryStatus: followUpData.status || entry.queryStatus,
+              followUpHistory: [...(entry.followUpHistory || []), newFollowUp],
+            };
           }
-          
-          return {
-            ...entry,
-            remark: followUpData.remark,
-            nextFollowUpDate: followUpData.nextFollowUpDate,
-            queryStatus: followUpData.status || entry.queryStatus,
-            followUpHistory: [...(entry.followUpHistory || []), newFollowUp],
-            lastUpdated: new Date().toISOString().split("T")[0],
-          };
-        }
-        return entry;
-      });
-    });
-  };
+          return entry;
+        })
+      );
+      
+      return { success: true, data: newFollowUp };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to add follow-up";
+      return { success: false, message };
+    }
+  }, []);
 
-  const getEntryById = (id) => {
-    return salesEntries.find((entry) => entry.id === id);
-  };
+  // Get follow-ups for a sales entry
+  const getFollowUps = useCallback(async (salesEntryId) => {
+    try {
+      const response = await followUpAPI.getBySalesEntry(salesEntryId);
+      return response.data.data || response.data;
+    } catch (err) {
+      console.error("Error fetching follow-ups:", err);
+      return [];
+    }
+  }, []);
 
-  const getSalesEntriesByUser = (userId) => {
-    return salesEntries.filter((entry) => entry.salesPersonId === userId);
-  };
+  // Get today's follow-ups
+  const getTodayFollowUps = useCallback(async () => {
+    try {
+      const response = await salesAPI.getTodayFollowUps();
+      return response.data.data || response.data;
+    } catch (err) {
+      console.error("Error fetching today's follow-ups:", err);
+      return [];
+    }
+  }, []);
 
-  const getAllSalesEntries = () => {
+  // Get overdue follow-ups
+  const getOverdueFollowUps = useCallback(async () => {
+    try {
+      const response = await salesAPI.getOverdueFollowUps();
+      return response.data.data || response.data;
+    } catch (err) {
+      console.error("Error fetching overdue follow-ups:", err);
+      return [];
+    }
+  }, []);
+
+  // Get dashboard stats
+  const getStats = useCallback(async () => {
+    try {
+      const response = await dashboardAPI.getStats();
+      console.log('Dashboard stats raw response:', response.data);
+      const statsData = response.data?.data || response.data || {};
+      console.log('Parsed stats data:', statsData);
+      
+      // Parse based on backend response structure
+      const statusWise = statsData.statusWise || {};
+      const followUps = statsData.followUps || {};
+      const performance = statsData.performance || {};
+      
+      const parsedStats = {
+        // Summary stats (top-level or from statusWise)
+        total: statsData.total ?? 0,
+        hot: statsData.hot ?? statusWise.hot ?? 0,
+        warm: statsData.warm ?? statusWise.warm ?? 0,
+        cold: statsData.cold ?? statusWise.cold ?? 0,
+        closed: statsData.closed ?? statusWise.closed ?? 0,
+        active: statsData.active ?? statusWise.active ?? 0,
+        
+        // Follow-ups
+        todayFollowUps: followUps.today ?? 0,
+        overdueFollowUps: followUps.overdue ?? 0,
+        
+        // Performance
+        conversionRate: performance.conversionRate ?? 0,
+        monthlyConversions: performance.monthlyConversions ?? 0,
+        
+        // Breakdowns
+        byBranch: statsData.byBranch || {},
+        byRequirement: statsData.byRequirement || {},
+        bySalesPerson: statsData.bySalesPerson || {},
+      };
+      
+      console.log('Final parsed stats:', parsedStats);
+      setStats(parsedStats);
+      return parsedStats;
+    } catch (err) {
+      console.error("Error fetching stats:", err);
+      console.error("Error response:", err.response?.data);
+      const defaultStats = {
+        total: 0,
+        hot: 0,
+        warm: 0,
+        cold: 0,
+        closed: 0,
+        active: 0,
+        todayFollowUps: 0,
+        overdueFollowUps: 0,
+        conversionRate: 0,
+        monthlyConversions: 0,
+        byBranch: {},
+        byRequirement: {},
+        bySalesPerson: {},
+      };
+      setStats(defaultStats);
+      return defaultStats;
+    }
+  }, []);
+
+  // Get analytics data
+  const getAnalytics = useCallback(async (params = {}) => {
+    try {
+      const response = await dashboardAPI.getAnalytics(params);
+      return response.data.data || response.data;
+    } catch (err) {
+      console.error("Error fetching analytics:", err);
+      return null;
+    }
+  }, []);
+
+  // Get all entries (returns current state)
+  const getAllSalesEntries = useCallback(() => {
     return salesEntries;
-  };
-
-  const getStats = () => {
-    const total = salesEntries.length;
-    const hot = salesEntries.filter((e) => e.queryStatus === "Hot").length;
-    const warm = salesEntries.filter((e) => e.queryStatus === "Warm").length;
-    const cold = salesEntries.filter((e) => e.queryStatus === "Cold").length;
-    const closed = salesEntries.filter(
-      (e) => e.queryStatus === "Closed",
-    ).length;
-
-    const byBranch = salesEntries.reduce((acc, entry) => {
-      acc[entry.branch] = (acc[entry.branch] || 0) + 1;
-      return acc;
-    }, {});
-
-    const byRequirement = {
-      Relocation: salesEntries.filter((e) => e.requirement === "Relocation")
-        .length,
-      HR: salesEntries.filter((e) => e.requirement === "HR").length,
-      "Real Estate": salesEntries.filter((e) => e.requirement === "Real Estate")
-        .length,
-    };
-
-    const bySalesPerson = salesEntries.reduce((acc, entry) => {
-      acc[entry.salesPersonName] = (acc[entry.salesPersonName] || 0) + 1;
-      return acc;
-    }, {});
-
-    return {
-      total,
-      hot,
-      warm,
-      cold,
-      closed,
-      byBranch,
-      byRequirement,
-      bySalesPerson,
-    };
-  };
+  }, [salesEntries]);
 
   return (
     <SalesContext.Provider
       value={{
         salesEntries,
+        stats,
+        loading,
+        error,
+        pagination,
+        fetchSalesEntries,
+        getSalesEntriesByUser,
+        getEntryById,
         addSalesEntry,
         updateSalesEntry,
+        deleteSalesEntry,
         addFollowUp,
-        getEntryById,
-        getSalesEntriesByUser,
-        getAllSalesEntries,
+        getFollowUps,
+        getTodayFollowUps,
+        getOverdueFollowUps,
         getStats,
+        getAnalytics,
+        getAllSalesEntries,
       }}
     >
       {children}

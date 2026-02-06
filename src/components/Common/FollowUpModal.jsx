@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { followUpAPI } from '../../services/api';
 
 const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUser = null }) => {
   const [newFollowUp, setNewFollowUp] = useState({
@@ -6,9 +7,21 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
     nextFollowUpDate: '',
     status: entry?.queryStatus || 'Warm',
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [followUpHistory, setFollowUpHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
+  // Format date from ISO or YYYY-MM-DD to DD-MM-YYYY
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}-${month}-${year}`;
+    }
+    // Fallback for YYYY-MM-DD format
     const parts = dateStr.split('-');
     if (parts.length === 3) {
       return `${parts[2]}-${parts[1]}-${parts[0]}`;
@@ -16,22 +29,106 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
     return dateStr;
   };
 
-  const handleSubmit = (e) => {
+  // Capitalize first letter for status display
+  const capitalizeStatus = (status) => {
+    if (!status) return '-';
+    return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+  };
+
+  // Get the name of who added the follow-up
+  const getAddedByName = (followUp) => {
+    if (followUp.addedByName) return followUp.addedByName;
+    if (typeof followUp.addedBy === 'object' && followUp.addedBy?.name) return followUp.addedBy.name;
+    if (typeof followUp.addedBy === 'string' && followUp.addedBy.length > 20) return 'User'; // It's an ObjectId
+    return followUp.addedBy || 'Unknown';
+  };
+
+  // Check if followUpHistory contains actual objects or just IDs
+  const isPopulatedArray = (arr) => {
+    if (!arr || arr.length === 0) return false;
+    // If first item is a string (ObjectId), it's not populated
+    return typeof arr[0] === 'object' && arr[0] !== null;
+  };
+
+  // Fetch follow-up history when modal opens
+  useEffect(() => {
+    const fetchFollowUpHistory = async () => {
+      const entryId = entry?._id || entry?.id;
+      console.log('Fetching follow-ups for entry:', entryId);
+      
+      if (!entryId) {
+        console.log('No entry ID found');
+        return;
+      }
+
+      // Check if entry already has POPULATED follow-up history (not just IDs)
+      if (isPopulatedArray(entry?.followUpHistory)) {
+        console.log('Using populated followUpHistory:', entry.followUpHistory);
+        setFollowUpHistory(entry.followUpHistory);
+        return;
+      }
+      if (isPopulatedArray(entry?.followUps)) {
+        console.log('Using populated followUps:', entry.followUps);
+        setFollowUpHistory(entry.followUps);
+        return;
+      }
+
+      // followUpHistory contains only IDs or is empty - fetch from API
+      setLoadingHistory(true);
+      try {
+        console.log('Calling API: /follow-ups/sales/' + entryId);
+        const response = await followUpAPI.getBySalesEntry(entryId);
+        console.log('API Response:', response);
+        const data = response.data?.data || response.data || [];
+        console.log('Parsed follow-up data:', data);
+        setFollowUpHistory(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Error fetching follow-up history:', error);
+        console.error('Error response:', error.response?.data);
+        setFollowUpHistory([]);
+      }
+      setLoadingHistory(false);
+    };
+
+    fetchFollowUpHistory();
+  }, [entry]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (newFollowUp.remark && newFollowUp.nextFollowUpDate) {
-      onAddFollowUp(entry.id, newFollowUp, currentUser?.name || 'Admin');
-      onClose();
+      setIsSubmitting(true);
+      try {
+        const followUpPayload = {
+          ...newFollowUp,
+          status: newFollowUp.status?.toLowerCase(), // Convert to lowercase for backend
+          addedBy: currentUser?._id || currentUser?.id,
+          addedByName: currentUser?.name || currentUser?.username,
+        };
+        console.log('Follow-up payload:', followUpPayload);
+        console.log('Current user:', currentUser);
+        console.log('Entry ID:', entry._id || entry.id);
+        await onAddFollowUp(entry._id || entry.id, followUpPayload);
+        onClose();
+      } catch (error) {
+        console.error('Error adding follow-up:', error);
+        console.error('Error response:', error.response?.data);
+      }
+      setIsSubmitting(false);
     }
   };
 
   const getStatusBadge = (status) => {
+    const normalizedStatus = capitalizeStatus(status);
     const badges = {
       Hot: 'bg-red-100 text-red-700',
       Warm: 'bg-amber-100 text-amber-700',
       Cold: 'bg-blue-100 text-blue-700',
       Closed: 'bg-green-100 text-green-700',
+      New: 'bg-purple-100 text-purple-700',
+      Active: 'bg-teal-100 text-teal-700',
+      Live: 'bg-emerald-100 text-emerald-700',
     };
-    return badges[status] || 'bg-gray-100 text-gray-700';
+    return badges[normalizedStatus] || 'bg-gray-100 text-gray-700';
   };
 
   return (
@@ -63,7 +160,7 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
             <div className="text-sm">
               <span className="text-gray-500">Current Status:</span>
               <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(entry?.queryStatus)}`}>
-                {entry?.queryStatus}
+                {capitalizeStatus(entry?.queryStatus)}
               </span>
             </div>
             <div className="text-sm">
@@ -103,7 +200,7 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
                     <option value="Cold">Cold</option>
                     <option value="Warm">Warm</option>
                     <option value="Hot">Hot</option>
-                    <option value="Closed">Live</option>
+                    <option value="Live">Live</option>
                     <option value="Closed">Closed</option>
 
                   </select>
@@ -122,9 +219,20 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
               </div>
               <button
                 type="submit"
-                className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                disabled={isSubmitting}
+                className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               >
-                Add Follow-Up
+                {isSubmitting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Adding...
+                  </>
+                ) : (
+                  'Add Follow-Up'
+                )}
               </button>
             </form>
           )}
@@ -135,10 +243,18 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              History ({entry?.followUpHistory?.length || 0} entries)
+              History ({followUpHistory.length} entries)
             </h3>
 
-            {(!entry?.followUpHistory || entry.followUpHistory.length === 0) ? (
+            {loadingHistory ? (
+              <div className="text-center py-6 text-gray-400">
+                <svg className="animate-spin h-8 w-8 mx-auto mb-2 text-indigo-500" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p className="text-sm">Loading history...</p>
+              </div>
+            ) : followUpHistory.length === 0 ? (
               <div className="text-center py-6 text-gray-400">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -147,20 +263,20 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
               </div>
             ) : (
               <div className="space-y-3">
-                {[...entry.followUpHistory].reverse().map((followUp, index) => (
-                  <div key={followUp.id || index} className="bg-white border border-gray-200 rounded-lg p-3 relative">
+                {[...followUpHistory].reverse().map((followUp, index) => (
+                  <div key={followUp._id || followUp.id || index} className="bg-white border border-gray-200 rounded-lg p-3 relative">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-gray-800">{formatDate(followUp.date)}</span>
+                        <span className="text-xs font-medium text-gray-800">{formatDate(followUp.followUpDate || followUp.createdAt || followUp.date)}</span>
                         {followUp.status && (
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${getStatusBadge(followUp.status)}`}>
-                            {followUp.status}
+                            {capitalizeStatus(followUp.status)}
                           </span>
                         )}
                       </div>
-                      <span className="text-xs text-gray-500">by {followUp.addedBy}</span>
+                      <span className="text-xs text-gray-500">by {getAddedByName(followUp)}</span>
                     </div>
-                    <p className="text-sm text-gray-600">{followUp.remark}</p>
+                    <p className="text-sm text-gray-600">{followUp.remark || '-'}</p>
                     <div className="mt-2 text-xs text-gray-400">
                       Next follow-up: {formatDate(followUp.nextFollowUpDate)}
                     </div>

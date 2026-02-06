@@ -1,14 +1,17 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSales } from '../../context/SalesContext';
+import { useAuth } from '../../context/AuthContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import StatCard from '../../components/Common/StatCard';
 import SalesTable from '../../components/Common/SalesTable';
 import FollowUpModal from '../../components/Common/FollowUpModal';
 
 const Dashboard = () => {
-  const { getAllSalesEntries, getStats, addFollowUp, updateSalesEntry } = useSales();
-  const entries = getAllSalesEntries();
-  const stats = getStats();
+  const { salesEntries, stats, loading, fetchSalesEntries, getStats, addFollowUp, updateSalesEntry } = useSales();
+  const { user } = useAuth();
+  
+  // Local state for entries
+  const [entries, setEntries] = useState([]);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,21 +29,48 @@ const Dashboard = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Get unique values for filters
-  const uniqueSalesPersons = [...new Set(entries.map(e => e.salesPersonName))];
-  const uniqueBranches = [...new Set(entries.map(e => e.branch))];
-  const uniqueRequirements = [...new Set(entries.map(e => e.requirement))];
-  const uniqueStatuses = [...new Set(entries.map(e => e.queryStatus))];
- //   const uniqueStatuses = ['Cold', 'Warm', 'Hot', 'Closed'];
+  // Load data on mount
+  const loadData = useCallback(async () => {
+    await fetchSalesEntries();
+    await getStats();
+  }, [fetchSalesEntries, getStats]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Update local entries when salesEntries changes
+  useEffect(() => {
+    setEntries(salesEntries);
+  }, [salesEntries]);
+
+  // Get unique values for filters - memoized for performance
+  const uniqueSalesPersons = useMemo(() => 
+    [...new Set(entries.map(e => e.salesPersonName || e.salesPerson?.name).filter(Boolean))].sort(),
+    [entries]
+  );
+  const uniqueBranches = useMemo(() => 
+    [...new Set(entries.map(e => e.branch).filter(Boolean))].sort(),
+    [entries]
+  );
+  const uniqueRequirements = useMemo(() => 
+    [...new Set(entries.map(e => e.requirement).filter(Boolean))].sort(),
+    [entries]
+  );
+  const uniqueStatuses = useMemo(() => 
+    [...new Set(entries.map(e => e.queryStatus).filter(Boolean))].sort(),
+    [entries]
+  );
 
   // Filtered entries
   const filteredEntries = useMemo(() => {
     return entries.filter(entry => {
+      const salesPersonName = entry.salesPersonName || entry.salesPerson?.name || '';
       const matchesSearch = searchTerm === '' || 
-        entry.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        entry.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        entry.location.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesSalesPerson = salesPersonFilter === '' || entry.salesPersonName === salesPersonFilter;
+        entry.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        entry.contactPerson?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        entry.location?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSalesPerson = salesPersonFilter === '' || salesPersonName === salesPersonFilter;
       const matchesBranch = branchFilter === '' || entry.branch === branchFilter;
       const matchesRequirement = requirementFilter === '' || entry.requirement === requirementFilter;
       const matchesStatus = statusFilter === '' || entry.queryStatus === statusFilter;
@@ -64,8 +94,9 @@ const Dashboard = () => {
     setSelectedEntry(entry);
   };
 
-  const handleAddFollowUp = (entryId, followUpData, addedBy) => {
-    addFollowUp(entryId, followUpData, addedBy, 'admin');
+  const handleAddFollowUp = async (entryId, followUpData, addedBy) => {
+    await addFollowUp(entryId, followUpData);
+    await fetchSalesEntries(); // Refresh data after adding follow-up
   };
 
   const closeModal = () => {
@@ -84,7 +115,7 @@ const Dashboard = () => {
       requirement: entry.requirement,
       location: entry.location,
       remark: entry.remark,
-      nextFollowUpDate: entry.nextFollowUpDate,
+      nextFollowUpDate: entry.nextFollowUpDate ? entry.nextFollowUpDate.split('T')[0] : '',
       queryStatus: entry.queryStatus,
     });
   };
@@ -97,10 +128,15 @@ const Dashboard = () => {
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    updateSalesEntry(editingEntry.id, editFormData);
-    setEditingEntry(null);
-    setSuccessMessage('Entry updated successfully!');
+    try {
+      await updateSalesEntry(editingEntry._id, editFormData);
+      setEditingEntry(null);
+      setSuccessMessage('Entry updated successfully!');
+      await fetchSalesEntries(); // Refresh data
+    } catch (error) {
+      console.error('Error updating entry:', error);
+      setSuccessMessage('Failed to update entry. Please try again.');
+    }
     setIsSubmitting(false);
     setTimeout(() => setSuccessMessage(''), 3000);
   };
@@ -129,6 +165,17 @@ const Dashboard = () => {
           </div>
         </div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg flex items-center">
+            <svg className="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Loading data...
+          </div>
+        )}
+
         {/* Success Message */}
         {successMessage && (
           <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center">
@@ -143,34 +190,34 @@ const Dashboard = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
           <StatCard
             title="Total Leads"
-            value={stats.total}
+            value={stats?.total || 0}
             icon="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
             color="blue"
           />
           <StatCard
             title="Hot Leads"
-            value={stats.hot}
+            value={stats?.hot || 0}
             icon="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"
             color="red"
             subtext="High priority"
           />
           <StatCard
             title="Warm Leads"
-            value={stats.warm}
+            value={stats?.warm || 0}
             icon="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707"
             color="yellow"
             subtext="In progress"
           />
           <StatCard
             title="Cold Leads"
-            value={stats.cold}
+            value={stats?.cold || 0}
             icon="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
             color="indigo"
             subtext="Need attention"
           />
           <StatCard
             title="Closed Deals"
-            value={stats.closed}
+            value={stats?.closed || 0}
             icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
             color="green"
             subtext="Completed"
@@ -188,20 +235,24 @@ const Dashboard = () => {
               Branch Performance
             </h3>
             <div className="space-y-3">
-              {Object.entries(stats.byBranch).map(([branch, count]) => (
-                <div key={branch} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">{branch}</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-24 bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full"
-                        style={{ width: `${(count / stats.total) * 100}%` }}
-                      ></div>
+              {stats?.byBranch && Object.keys(stats.byBranch).length > 0 ? (
+                Object.entries(stats.byBranch).map(([branch, count]) => (
+                  <div key={branch} className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">{branch}</span>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-24 bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full"
+                          style={{ width: `${stats.total ? (count / stats.total) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-sm font-medium text-gray-800 w-8 text-right">{count}</span>
                     </div>
-                    <span className="text-sm font-medium text-gray-800 w-8 text-right">{count}</span>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">No branch data available</p>
+              )}
             </div>
           </div>
 
@@ -214,27 +265,31 @@ const Dashboard = () => {
               By Service Type
             </h3>
             <div className="space-y-3">
-              {Object.entries(stats.byRequirement).map(([req, count]) => {
-                const colors = {
-                  Relocation: 'bg-purple-600',
-                  HR: 'bg-indigo-600',
-                  'Real Estate': 'bg-teal-600',
-                };
-                return (
-                  <div key={req} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">{req}</span>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-24 bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`${colors[req]} h-2 rounded-full`}
-                          style={{ width: `${(count / stats.total) * 100}%` }}
-                        ></div>
+              {stats?.byRequirement && Object.keys(stats.byRequirement).length > 0 ? (
+                Object.entries(stats.byRequirement).map(([req, count]) => {
+                  const colors = {
+                    Relocation: 'bg-purple-600',
+                    HR: 'bg-indigo-600',
+                    'Real Estate': 'bg-teal-600',
+                  };
+                  return (
+                    <div key={req} className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">{req}</span>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-24 bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`${colors[req] || 'bg-gray-600'} h-2 rounded-full`}
+                            style={{ width: `${stats.total ? (count / stats.total) * 100 : 0}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm font-medium text-gray-800 w-8 text-right">{count}</span>
                       </div>
-                      <span className="text-sm font-medium text-gray-800 w-8 text-right">{count}</span>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">No service type data available</p>
+              )}
             </div>
           </div>
 
@@ -247,22 +302,26 @@ const Dashboard = () => {
               Top Performers
             </h3>
             <div className="space-y-3">
-              {Object.entries(stats.bySalesPerson)
-                .sort((a, b) => b[1] - a[1])
-                .map(([name, count]) => (
-                  <div key={name} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">{name}</span>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-24 bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-green-600 h-2 rounded-full"
-                          style={{ width: `${(count / stats.total) * 100}%` }}
-                        ></div>
+              {stats?.bySalesPerson && Object.keys(stats.bySalesPerson).length > 0 ? (
+                Object.entries(stats.bySalesPerson)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([name, count]) => (
+                    <div key={name} className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">{name}</span>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-24 bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-green-600 h-2 rounded-full"
+                            style={{ width: `${stats.total ? (count / stats.total) * 100 : 0}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm font-medium text-gray-800 w-8 text-right">{count}</span>
                       </div>
-                      <span className="text-sm font-medium text-gray-800 w-8 text-right">{count}</span>
                     </div>
-                  </div>
-                ))}
+                  ))
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">No performer data available</p>
+              )}
             </div>
           </div>
         </div>
@@ -371,7 +430,7 @@ const Dashboard = () => {
             onClose={closeModal}
             onAddFollowUp={handleAddFollowUp}
             mode="both"
-            currentUser={{ name: 'Admin' }}
+            currentUser={user}
           />
         )}
 

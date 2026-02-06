@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSales } from '../../context/SalesContext';
 import MainLayout from '../../components/Layout/MainLayout';
@@ -7,25 +7,84 @@ import FollowUpModal from '../../components/Common/FollowUpModal';
 
 const MyEntries = () => {
   const { user } = useAuth();
-  const { getSalesEntriesByUser, addFollowUp } = useSales();
-  const myEntries = getSalesEntriesByUser(user.id);
+  const { salesEntries, loading, fetchSalesEntries, addFollowUp } = useSales();
+  const [myEntries, setMyEntries] = useState([]);
 
-  const [filter, setFilter] = useState('');
+  // Filter states (similar to AllSales)
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [branchFilter, setBranchFilter] = useState('');
+  const [requirementFilter, setRequirementFilter] = useState('');
+  
   const [successMessage, setSuccessMessage] = useState('');
   const [followUpEntry, setFollowUpEntry] = useState(null);
   const [followUpMode, setFollowUpMode] = useState('view');
 
-  const filteredEntries = filter
-    ? myEntries.filter((e) => e.queryStatus === filter)
-    : myEntries;
+  // Load data on mount
+  const loadData = useCallback(async () => {
+    await fetchSalesEntries();
+  }, [fetchSalesEntries]);
 
-  const stats = {
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Filter entries for current user
+  useEffect(() => {
+    if (user && salesEntries.length > 0) {
+      const userEntries = salesEntries.filter(
+        entry => entry.salesPerson === user._id || entry.salesPerson?._id === user._id
+      );
+      setMyEntries(userEntries);
+    }
+  }, [salesEntries, user]);
+
+  // Get unique values for dynamic filters
+  const uniqueBranches = useMemo(() => 
+    [...new Set(myEntries.map(e => e.branch).filter(Boolean))].sort(),
+    [myEntries]
+  );
+  const uniqueRequirements = useMemo(() => 
+    [...new Set(myEntries.map(e => e.requirement).filter(Boolean))].sort(),
+    [myEntries]
+  );
+  const uniqueStatuses = useMemo(() => 
+    [...new Set(myEntries.map(e => e.queryStatus).filter(Boolean))].sort(),
+    [myEntries]
+  );
+
+  // Filtered entries with useMemo for performance
+  const filteredEntries = useMemo(() => {
+    return myEntries.filter((entry) => {
+      const matchesSearch = searchTerm === '' ||
+        entry.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        entry.contactPerson?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        entry.location?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === '' || entry.queryStatus === statusFilter;
+      const matchesRequirement = requirementFilter === '' || entry.requirement === requirementFilter;
+      const matchesBranch = branchFilter === '' || entry.branch === branchFilter;
+
+      return matchesSearch && matchesStatus && matchesRequirement && matchesBranch;
+    });
+  }, [myEntries, searchTerm, statusFilter, requirementFilter, branchFilter]);
+
+  const stats = useMemo(() => ({
     total: myEntries.length,
     hot: myEntries.filter((e) => e.queryStatus === 'Hot').length,
     warm: myEntries.filter((e) => e.queryStatus === 'Warm').length,
     cold: myEntries.filter((e) => e.queryStatus === 'Cold').length,
     closed: myEntries.filter((e) => e.queryStatus === 'Closed').length,
+  }), [myEntries]);
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('');
+    setBranchFilter('');
+    setRequirementFilter('');
   };
+
+  const hasActiveFilters = searchTerm || statusFilter || branchFilter || requirementFilter;
 
   const handleViewFollowUp = (entry) => {
     setFollowUpEntry(entry);
@@ -34,11 +93,12 @@ const MyEntries = () => {
 
   const handleAddFollowUp = (entry) => {
     setFollowUpEntry(entry);
-    setFollowUpMode('both');
+    setFollowUpMode('add');
   };
 
-  const handleFollowUpSubmit = (entryId, followUpData, addedBy) => {
-    addFollowUp(entryId, followUpData, addedBy, 'salesperson');
+  const handleFollowUpSubmit = async (entryId, followUpData) => {
+    await addFollowUp(entryId, followUpData);
+    await fetchSalesEntries(); // Refresh data after adding follow-up
     setSuccessMessage('Follow-up added successfully!');
     setTimeout(() => setSuccessMessage(''), 3000);
   };
@@ -80,50 +140,122 @@ const MyEntries = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-5 gap-4">
           <button
-            onClick={() => setFilter('')}
+            onClick={() => setStatusFilter('')}
             className={`p-4 rounded-xl text-center transition-all ${
-              filter === '' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-700 hover:bg-gray-50'
+              statusFilter === '' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-700 hover:bg-gray-50'
             }`}
           >
             <p className="text-2xl font-bold">{stats.total}</p>
             <p className="text-xs font-medium mt-1">Total</p>
           </button>
           <button
-            onClick={() => setFilter('Hot')}
+            onClick={() => setStatusFilter('Hot')}
             className={`p-4 rounded-xl text-center transition-all ${
-              filter === 'Hot' ? 'bg-red-600 text-white shadow-lg' : 'bg-white text-gray-700 hover:bg-gray-50'
+              statusFilter === 'Hot' ? 'bg-red-600 text-white shadow-lg' : 'bg-white text-gray-700 hover:bg-gray-50'
             }`}
           >
             <p className="text-2xl font-bold">{stats.hot}</p>
             <p className="text-xs font-medium mt-1">Hot</p>
           </button>
           <button
-            onClick={() => setFilter('Warm')}
+            onClick={() => setStatusFilter('Warm')}
             className={`p-4 rounded-xl text-center transition-all ${
-              filter === 'Warm' ? 'bg-yellow-500 text-white shadow-lg' : 'bg-white text-gray-700 hover:bg-gray-50'
+              statusFilter === 'Warm' ? 'bg-yellow-500 text-white shadow-lg' : 'bg-white text-gray-700 hover:bg-gray-50'
             }`}
           >
             <p className="text-2xl font-bold">{stats.warm}</p>
             <p className="text-xs font-medium mt-1">Warm</p>
           </button>
           <button
-            onClick={() => setFilter('Cold')}
+            onClick={() => setStatusFilter('Cold')}
             className={`p-4 rounded-xl text-center transition-all ${
-              filter === 'Cold' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-gray-700 hover:bg-gray-50'
+              statusFilter === 'Cold' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-gray-700 hover:bg-gray-50'
             }`}
           >
             <p className="text-2xl font-bold">{stats.cold}</p>
             <p className="text-xs font-medium mt-1">Cold</p>
           </button>
           <button
-            onClick={() => setFilter('Closed')}
+            onClick={() => setStatusFilter('Closed')}
             className={`p-4 rounded-xl text-center transition-all ${
-              filter === 'Closed' ? 'bg-green-600 text-white shadow-lg' : 'bg-white text-gray-700 hover:bg-gray-50'
+              statusFilter === 'Closed' ? 'bg-green-600 text-white shadow-lg' : 'bg-white text-gray-700 hover:bg-gray-50'
             }`}
           >
             <p className="text-2xl font-bold">{stats.closed}</p>
             <p className="text-xs font-medium mt-1">Closed</p>
           </button>
+        </div>
+
+        {/* Filter Controls - Similar to AllSales */}
+        <div className="bg-white rounded-lg shadow-sm p-3 border border-gray-100">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Search Bar */}
+            <div className="relative flex-1 min-w-[180px]">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search company, contact, location..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            {/* Branch Filter */}
+            <select
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value)}
+              className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-[110px]"
+            >
+              <option value="">All Branches</option>
+              {uniqueBranches.map((branch) => (
+                <option key={branch} value={branch}>{branch}</option>
+              ))}
+            </select>
+
+            {/* Requirement Filter */}
+            <select
+              value={requirementFilter}
+              onChange={(e) => setRequirementFilter(e.target.value)}
+              className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-[110px]"
+            >
+              <option value="">All Services</option>
+              {uniqueRequirements.map((req) => (
+                <option key={req} value={req}>{req}</option>
+              ))}
+            </select>
+
+            {/* Status Filter Dropdown */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-[100px]"
+            >
+              <option value="">All Status</option>
+              {uniqueStatuses.map((status) => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
+
+            {/* Clear Filters */}
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="px-2 py-1.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Clear
+              </button>
+            )}
+          </div>
+          {/* Results count */}
+          <p className="text-xs text-gray-500 mt-2">
+            Showing {filteredEntries.length} of {myEntries.length} entries
+          </p>
         </div>
 
         {/* Entries Table */}
