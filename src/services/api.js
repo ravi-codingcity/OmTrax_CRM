@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://omtrax-crm-backend.onrender.com/api';
+const API_BASE_URL = 'https://gold-shark-656819.hostingersite.com/api';
 
 // Create axios instance
 const api = axios.create({
@@ -49,6 +49,7 @@ export const authAPI = {
   login: (data) => api.post('/auth/login', data),
   getMe: () => api.get('/auth/me'),
   updatePassword: (data) => api.put('/auth/update-password', data),
+  resetPassword: (data) => api.post('/auth/reset-password', data),
   getUsers: () => api.get('/auth/users'),
   updateUser: (id, data) => api.put(`/auth/users/${id}`, data),
 };

@@ -8,6 +8,17 @@ const SalesAnalytics = () => {
   const { salesEntries, loading, fetchSalesEntries } = useSales();
   const [myEntries, setMyEntries] = useState([]);
 
+  // Format date to DD-MM-YYYY
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+
   // Load data on mount
   const loadData = useCallback(async () => {
     await fetchSalesEntries();
@@ -30,10 +41,10 @@ const SalesAnalytics = () => {
   // Calculate stats with useMemo for performance
   const stats = useMemo(() => ({
     total: myEntries.length,
-    hot: myEntries.filter((e) => e.queryStatus === 'Hot').length,
-    warm: myEntries.filter((e) => e.queryStatus === 'Warm').length,
-    cold: myEntries.filter((e) => e.queryStatus === 'Cold').length,
-    closed: myEntries.filter((e) => e.queryStatus === 'Closed').length,
+    hot: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'hot').length,
+    warm: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'warm').length,
+    cold: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'cold').length,
+    closed: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'closed').length,
   }), [myEntries]);
 
   const conversionRate = useMemo(() => 
@@ -78,7 +89,7 @@ const SalesAnalytics = () => {
     return myEntries
       .filter((e) => {
         const followUpDate = e.nextFollowUpDate ? e.nextFollowUpDate.split('T')[0] : '';
-        return followUpDate >= today && e.queryStatus !== 'Closed';
+        return followUpDate >= today && e.queryStatus?.toLowerCase() !== 'closed';
       })
       .sort((a, b) => new Date(a.nextFollowUpDate) - new Date(b.nextFollowUpDate))
       .slice(0, 5);
@@ -241,7 +252,7 @@ const SalesAnalytics = () => {
                       <p className="text-xs text-gray-500">{entry.contactPerson}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-medium text-blue-600">{entry.nextFollowUpDate}</p>
+                      <p className="text-xs font-medium text-blue-600">{formatDate(entry.nextFollowUpDate)}</p>
                       <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${
                         entry.queryStatus === 'Hot' ? 'bg-red-100 text-red-700' :
                         entry.queryStatus === 'Warm' ? 'bg-amber-100 text-amber-700' :

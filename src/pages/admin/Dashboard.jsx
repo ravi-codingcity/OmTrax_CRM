@@ -20,6 +20,10 @@ const Dashboard = () => {
   const [requirementFilter, setRequirementFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const entriesPerPage = 30;
+
   // Follow-up modal state
   const [selectedEntry, setSelectedEntry] = useState(null);
 
@@ -78,7 +82,15 @@ const Dashboard = () => {
     });
   }, [entries, searchTerm, salesPersonFilter, branchFilter, requirementFilter, statusFilter]);
 
-  const recentEntries = filteredEntries.slice(0, 10);
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredEntries.length / entriesPerPage);
+  const startIndex = (currentPage - 1) * entriesPerPage;
+  const paginatedEntries = filteredEntries.slice(startIndex, startIndex + entriesPerPage);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, salesPersonFilter, branchFilter, requirementFilter, statusFilter]);
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -420,7 +432,49 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <SalesTable entries={recentEntries} onViewFollowUp={handleViewFollowUp} onEdit={handleEdit} />
+          <SalesTable entries={paginatedEntries} onViewFollowUp={handleViewFollowUp} onEdit={handleEdit} />
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between bg-white rounded-lg shadow-sm px-4 py-3 border border-gray-100 mt-4">
+              <div className="text-sm text-gray-600">
+                Showing {startIndex + 1} to {Math.min(startIndex + entriesPerPage, filteredEntries.length)} of {filteredEntries.length} entries
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  First
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="px-3 py-1 text-sm font-medium text-gray-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Last
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Follow-Up Modal */}
@@ -519,9 +573,16 @@ const Dashboard = () => {
                       className={inputClasses}
                       required
                     >
-                      <option value="Relocation">Relocation</option>
-                      <option value="HR">HR</option>
-                      <option value="Real Estate">Real Estate</option>
+                      <option value="HHG Relocation">HHG Relocation</option>
+                  <option value="Office Relocation">Office Relocation</option>
+                  <option value="Demo Relocation">Demo Relocation</option>
+                  <option value="Lab Movements">Lab Movements</option>
+                  <option value="Furniture Movements">Furniture Movements</option>
+                  <option value="Car Movements">Car Movements</option>
+                  <option value="Data Center Movements">Data Center Movements</option>
+                  <option value="IT Assets Movements">IT Assets Movements</option>
+                  <option value="HR & Recruitment">HR & Recruitment</option>
+                  <option value="Real Estate">Real Estate</option>
                     </select>
                   </div>
                   <div>
@@ -555,10 +616,11 @@ const Dashboard = () => {
                       className={inputClasses}
                       required
                     >
-                      <option value="Cold">Cold</option>
-                      <option value="Warm">Warm</option>
-                      <option value="Hot">Hot</option>
-                      <option value="Closed">Closed</option>
+                    <option value="Cold">Cold</option>
+                  <option value="Warm">Warm</option>
+                  <option value="Hot">Hot</option>
+                  <option value="Closed">Closed</option>
+                  <option value="Active">Active</option>
                     </select>
                   </div>
                   <div className="col-span-2">

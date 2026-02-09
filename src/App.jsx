@@ -4,6 +4,8 @@ import { SalesProvider } from './context/SalesContext';
 import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/Common/ProtectedRoute';
 import Login from './pages/Login';
+import Signup from './pages/Signup';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/admin/Dashboard';
 import AllSales from './pages/admin/AllSales';
 import Analytics from './pages/admin/Analytics';
@@ -21,6 +23,8 @@ function App() {
             <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
+              <Route path="/108/signup" element={<Signup />} />
+              <Route path="/108/reset-password" element={<ResetPassword />} />
               
               {/* Admin Routes */}
               <Route

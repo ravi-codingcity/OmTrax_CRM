@@ -98,7 +98,7 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
               <td className="px-3 py-2.5 text-xs text-gray-700 border-b border-r border-gray-200 align-middle whitespace-nowrap">{formatDate(entry.createdAt || entry.date)}</td>
               {showSalesPerson && (
                 <td className="px-3 py-2.5 border-b border-r border-gray-200 align-middle">
-                  <p className="text-xs font-medium text-gray-800">{getSalesPersonName(entry)}</p>
+                  <p className="text-xs font-medium text-red-600">{getSalesPersonName(entry)}</p>
                   <p className="text-xs text-gray-500">{entry.branch}</p>
                 </td>
               )}

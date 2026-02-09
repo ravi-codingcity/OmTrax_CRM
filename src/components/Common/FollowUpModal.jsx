@@ -61,33 +61,56 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
         return;
       }
 
+      let historyData = [];
+
       // Check if entry already has POPULATED follow-up history (not just IDs)
       if (isPopulatedArray(entry?.followUpHistory)) {
         console.log('Using populated followUpHistory:', entry.followUpHistory);
-        setFollowUpHistory(entry.followUpHistory);
-        return;
-      }
-      if (isPopulatedArray(entry?.followUps)) {
+        historyData = [...entry.followUpHistory];
+      } else if (isPopulatedArray(entry?.followUps)) {
         console.log('Using populated followUps:', entry.followUps);
-        setFollowUpHistory(entry.followUps);
-        return;
+        historyData = [...entry.followUps];
+      } else {
+        // followUpHistory contains only IDs or is empty - fetch from API
+        setLoadingHistory(true);
+        try {
+          console.log('Calling API: /follow-ups/sales/' + entryId);
+          const response = await followUpAPI.getBySalesEntry(entryId);
+          console.log('API Response:', response);
+          const data = response.data?.data || response.data || [];
+          console.log('Parsed follow-up data:', data);
+          historyData = Array.isArray(data) ? data : [];
+        } catch (error) {
+          console.error('Error fetching follow-up history:', error);
+          console.error('Error response:', error.response?.data);
+          historyData = [];
+        }
+        setLoadingHistory(false);
       }
 
-      // followUpHistory contains only IDs or is empty - fetch from API
-      setLoadingHistory(true);
-      try {
-        console.log('Calling API: /follow-ups/sales/' + entryId);
-        const response = await followUpAPI.getBySalesEntry(entryId);
-        console.log('API Response:', response);
-        const data = response.data?.data || response.data || [];
-        console.log('Parsed follow-up data:', data);
-        setFollowUpHistory(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error('Error fetching follow-up history:', error);
-        console.error('Error response:', error.response?.data);
-        setFollowUpHistory([]);
+      // Add initial entry remark as first history item if it exists and not already in history
+      if (entry?.remark && entry.remark.trim()) {
+        const initialRemarkExists = historyData.some(
+          item => item.isInitialRemark || 
+          (item.remark === entry.remark && !item.followUpDate && !item.nextFollowUpDate)
+        );
+        
+        if (!initialRemarkExists) {
+          const initialRemark = {
+            _id: 'initial-' + entryId,
+            remark: entry.remark,
+            status: entry.queryStatus,
+            followUpDate: entry.createdAt || entry.date,
+            createdAt: entry.createdAt || entry.date,
+            nextFollowUpDate: entry.nextFollowUpDate,
+            addedByName: entry.salesPersonName || entry.salesPerson?.name || 'Sales Person',
+            isInitialRemark: true,
+          };
+          historyData = [...historyData, initialRemark];
+        }
       }
-      setLoadingHistory(false);
+
+      setFollowUpHistory(historyData);
     };
 
     fetchFollowUpHistory();
@@ -263,28 +286,62 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
               </div>
             ) : (
               <div className="space-y-3">
-                {[...followUpHistory].reverse().map((followUp, index) => (
-                  <div key={followUp._id || followUp.id || index} className="bg-white border border-gray-200 rounded-lg p-3 relative">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-gray-800">{formatDate(followUp.followUpDate || followUp.createdAt || followUp.date)}</span>
-                        {followUp.status && (
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${getStatusBadge(followUp.status)}`}>
-                            {capitalizeStatus(followUp.status)}
-                          </span>
+                {[...followUpHistory]
+                  .sort((a, b) => {
+                    const dateA = new Date(a.followUpDate || a.createdAt || a.date || 0);
+                    const dateB = new Date(b.followUpDate || b.createdAt || b.date || 0);
+                    return dateB - dateA; // Newest first
+                  })
+                  .map((followUp, index, sortedArray) => {
+                    const isLatest = index === 0;
+                    const isInitial = followUp.isInitialRemark;
+                    
+                    return (
+                      <div 
+                        key={followUp._id || followUp.id || index} 
+                        className={`bg-white border rounded-lg p-3 relative ${
+                          isLatest 
+                            ? 'border-indigo-300 bg-indigo-50/50 ring-1 ring-indigo-200' 
+                            : isInitial
+                              ? 'border-green-300 bg-green-50/50'
+                              : 'border-gray-200'
+                        }`}
+                      >
+                        {/* Badge for entry type */}
+                        {isLatest && !isInitial && (
+                          <div className="absolute -top-2 left-3 px-2 py-0.5 bg-indigo-500 text-white text-[10px] font-semibold rounded-full">
+                            Latest
+                          </div>
+                        )}
+                        {isInitial && (
+                          <div className={`absolute -top-2 left-3 px-2 py-0.5 ${isLatest ? 'bg-indigo-500' : 'bg-green-500'} text-white text-[10px] font-semibold rounded-full`}>
+                            {isLatest ? 'Latest • Initial Entry' : 'Initial Entry'}
+                          </div>
+                        )}
+                        <div className={`flex items-start justify-between mb-2 ${(isLatest || isInitial) ? 'mt-1' : ''}`}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-gray-800">{formatDate(followUp.followUpDate || followUp.createdAt || followUp.date)}</span>
+                            {followUp.status && (
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${getStatusBadge(followUp.status)}`}>
+                                {capitalizeStatus(followUp.status)}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-500">by {getAddedByName(followUp)}</span>
+                        </div>
+                        {/* Full remark display - no truncation */}
+                        <div className="text-sm text-gray-600 whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
+                          {followUp.remark || '-'}
+                        </div>
+                        <div className="mt-2 text-xs text-gray-400">
+                          Next follow-up: {formatDate(followUp.nextFollowUpDate)}
+                        </div>
+                        {isLatest && (
+                          <div className="absolute -left-1 top-6 w-2 h-2 bg-indigo-500 rounded-full"></div>
                         )}
                       </div>
-                      <span className="text-xs text-gray-500">by {getAddedByName(followUp)}</span>
-                    </div>
-                    <p className="text-sm text-gray-600">{followUp.remark || '-'}</p>
-                    <div className="mt-2 text-xs text-gray-400">
-                      Next follow-up: {formatDate(followUp.nextFollowUpDate)}
-                    </div>
-                    {index === 0 && (
-                      <div className="absolute -left-1 top-3 w-2 h-2 bg-indigo-500 rounded-full"></div>
-                    )}
-                  </div>
-                ))}
+                    );
+                  })}
               </div>
             )}
           </div>

@@ -20,6 +20,10 @@ const MyEntries = () => {
   const [followUpEntry, setFollowUpEntry] = useState(null);
   const [followUpMode, setFollowUpMode] = useState('view');
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const entriesPerPage = 30;
+
   // Load data on mount
   const loadData = useCallback(async () => {
     await fetchSalesEntries();
@@ -69,12 +73,22 @@ const MyEntries = () => {
     });
   }, [myEntries, searchTerm, statusFilter, requirementFilter, branchFilter]);
 
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredEntries.length / entriesPerPage);
+  const startIndex = (currentPage - 1) * entriesPerPage;
+  const paginatedEntries = filteredEntries.slice(startIndex, startIndex + entriesPerPage);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, requirementFilter, branchFilter]);
+
   const stats = useMemo(() => ({
     total: myEntries.length,
-    hot: myEntries.filter((e) => e.queryStatus === 'Hot').length,
-    warm: myEntries.filter((e) => e.queryStatus === 'Warm').length,
-    cold: myEntries.filter((e) => e.queryStatus === 'Cold').length,
-    closed: myEntries.filter((e) => e.queryStatus === 'Closed').length,
+    hot: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'hot').length,
+    warm: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'warm').length,
+    cold: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'cold').length,
+    closed: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'closed').length,
   }), [myEntries]);
 
   const clearFilters = () => {
@@ -254,17 +268,59 @@ const MyEntries = () => {
           </div>
           {/* Results count */}
           <p className="text-xs text-gray-500 mt-2">
-            Showing {filteredEntries.length} of {myEntries.length} entries
+            Showing {startIndex + 1} to {Math.min(startIndex + entriesPerPage, filteredEntries.length)} of {filteredEntries.length} entries
           </p>
         </div>
 
         {/* Entries Table */}
         <SalesTable 
-          entries={filteredEntries} 
+          entries={paginatedEntries} 
           showSalesPerson={false} 
           onViewFollowUp={handleViewFollowUp}
           onAddFollowUp={handleAddFollowUp}
         />
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between bg-white rounded-lg shadow-sm px-4 py-3 border border-gray-100">
+            <div className="text-sm text-gray-600">
+              Showing {startIndex + 1} to {Math.min(startIndex + entriesPerPage, filteredEntries.length)} of {filteredEntries.length} entries
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                First
+              </button>
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="px-3 py-1 text-sm font-medium text-gray-700">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Last
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Follow-Up Modal */}
         {followUpEntry && (

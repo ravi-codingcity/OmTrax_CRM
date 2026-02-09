@@ -37,7 +37,8 @@ export const SalesProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await salesAPI.getAll(params);
+      // Fetch all entries (high limit) - frontend handles pagination
+      const response = await salesAPI.getAll({ limit: 1000, ...params });
       const data = response.data.data || response.data;
       
       if (Array.isArray(data)) {
