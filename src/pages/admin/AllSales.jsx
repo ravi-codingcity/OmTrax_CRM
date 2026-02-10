@@ -24,7 +24,7 @@ const AllSales = () => {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const entriesPerPage = 30;
+  const entriesPerPage = 15;
 
   // Load data on mount
   const loadData = useCallback(async () => {

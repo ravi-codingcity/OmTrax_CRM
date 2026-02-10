@@ -22,7 +22,7 @@ const Dashboard = () => {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const entriesPerPage = 30;
+  const entriesPerPage = 15;
 
   // Follow-up modal state
   const [selectedEntry, setSelectedEntry] = useState(null);
@@ -199,7 +199,7 @@ const Dashboard = () => {
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard
             title="Total Leads"
             value={stats?.total || 0}
@@ -233,6 +233,13 @@ const Dashboard = () => {
             icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
             color="green"
             subtext="Completed"
+          />
+          <StatCard
+            title="Active Leads"
+            value={stats?.active || 0}
+            icon="M13 10V3L4 14h7v7l9-11h-7z"
+            color="teal"
+            subtext="In pipeline"
           />
         </div>
 
