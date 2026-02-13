@@ -17,15 +17,30 @@ const Header = () => {
     markAsRead, 
     markAllAsRead,
     markReminderAsRead,
-    markAllRemindersAsRead,
+    dismissReminder,
+    dismissAllReminders,
+    deleteNotification,
   } = useNotifications();
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [dismissingIds, setDismissingIds] = useState(new Set());
   const notificationRef = useRef(null);
 
   // Combine notifications and reminders, sorted by date (newest first), limit to 20
+  // Filter out read/dismissed reminders for all users
   const allNotifications = useMemo(() => {
-    const combined = [...notifications, ...reminders];
+    let combined = [...notifications, ...reminders];
+    
+    // Filter out read reminders (they should not appear for any user)
+    combined = combined.filter((n) => {
+      // Keep non-reminder notifications as is (unless read for Admin)
+      if (n.type !== 'reminder' && n.type !== 'overdue') {
+        return !n.isRead;
+      }
+      // For reminders/overdue: only show unread ones
+      return !n.isRead;
+    });
+    
     // Sort by date descending (latest first)
     const sorted = combined.sort((a, b) => {
       const dateA = new Date(a.createdAt || a.nextFollowUpDate);
@@ -37,6 +52,7 @@ const Header = () => {
   }, [notifications, reminders]);
 
   // Total badge count (unread notifications + unread reminders)
+  // For Salesperson: only count unread reminders that are not dismissed
   const totalBadgeCount = useMemo(() => {
     const unreadReminders = reminders.filter((r) => !r.isRead).length;
     return unreadCount + unreadReminders;
@@ -77,30 +93,83 @@ const Header = () => {
   };
 
   const handleNotificationClick = async (notification) => {
-    // For reminders, mark as read (same behavior as regular notifications)
+    if (notification.isRead) return;
+    
+    const notificationId = notification._id;
+    
+    // Start dismiss animation
+    setDismissingIds(prev => new Set([...prev, notificationId]));
+    
+    // For reminders/overdue
     if (notification.type === 'reminder' || notification.type === 'overdue') {
-      if (!notification.isRead) {
-        await markReminderAsRead(notification._id);
-      }
+      await markReminderAsRead(notificationId);
+      // Dismiss after animation completes
+      setTimeout(async () => {
+        await dismissReminder(notificationId);
+        setDismissingIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(notificationId);
+          return newSet;
+        });
+      }, 300);
       return;
     }
-    // For regular notifications, mark as read
-    if (!notification.isRead) {
-      await markAsRead(notification._id);
-    }
+    
+    // For regular notifications (new_entry, sales_entry, followup)
+    await markAsRead(notificationId);
+    // Delete notification after animation
+    setTimeout(async () => {
+      await deleteNotification(notificationId);
+      setDismissingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(notificationId);
+        return newSet;
+      });
+    }, 300);
   };
 
   const handleMarkAllAsRead = async () => {
-    await markAllAsRead();
-    // Also mark all reminders as read using the new function
-    markAllRemindersAsRead();
+    // Start dismiss animation for all
+    const allIds = allNotifications.map(n => n._id);
+    setDismissingIds(new Set(allIds));
+    
+    // Dismiss all after animation
+    setTimeout(async () => {
+      await markAllAsRead();
+      await dismissAllReminders();
+      setDismissingIds(new Set());
+    }, 300);
   };
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    
+    const now = new Date();
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const isToday = date.toDateString() === now.toDateString();
+    
+    // For today's date
+    if (isToday) {
+      return 'Today';
+    }
+    
+    // For dates in the past
+    if (diffDays === 1) {
+      return 'Yesterday';
+    } else if (diffDays > 1 && diffDays < 7) {
+      return `${diffDays} days ago`;
+    } else if (diffDays < 0 && diffDays > -7) {
+      // Future dates (upcoming reminders)
+      const futureDays = Math.abs(diffDays);
+      if (futureDays === 1) return 'Tomorrow';
+      return `In ${futureDays} days`;
+    } else {
+      // Older or further future - show date
+      return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    }
   };
 
   const formatFollowUpDate = (dateString) => {
@@ -279,8 +348,10 @@ const Header = () => {
                         <div
                           key={notification._id}
                           onClick={() => handleNotificationClick(notification)}
-                          className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-all hover:bg-gray-50 ${
-                            !notification.isRead 
+                          className={`px-4 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50
+                            transition-all duration-300 ease-out
+                            ${dismissingIds.has(notification._id) ? 'opacity-0 -translate-x-4 max-h-0 py-0 overflow-hidden' : 'opacity-100 translate-x-0 max-h-40'}
+                            ${!notification.isRead 
                               ? notification.type === 'overdue' 
                                 ? 'bg-orange-50/50' 
                                 : notification.type === 'reminder' 

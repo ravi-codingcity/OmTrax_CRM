@@ -3,25 +3,6 @@ import { notificationAPI } from '../services/api';
 
 const NotificationContext = createContext(null);
 
-// Helper to get read reminder IDs from localStorage
-const getReadReminderIds = () => {
-  try {
-    const stored = localStorage.getItem('omtrax_read_reminders');
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-};
-
-// Helper to save read reminder IDs to localStorage
-const saveReadReminderIds = (ids) => {
-  try {
-    localStorage.setItem('omtrax_read_reminders', JSON.stringify(ids));
-  } catch (e) {
-    console.error('Error saving read reminders:', e);
-  }
-};
-
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [reminders, setReminders] = useState([]);
@@ -29,7 +10,7 @@ export const NotificationProvider = ({ children }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // Fetch follow-up reminders from the new endpoint
+  // Fetch follow-up reminders from the backend (filtered by dismissed)
   const fetchReminders = useCallback(async () => {
     try {
       console.log('Fetching reminders from /notifications/reminders...');
@@ -40,19 +21,17 @@ export const NotificationProvider = ({ children }) => {
       const reminderData = response.data?.data || [];
       const summary = response.data?.summary || { total: 0, overdue: 0, today: 0 };
 
-      // Get read reminder IDs from localStorage
-      const readIds = getReadReminderIds();
-
       // Add type based on isOverdue flag if not already set
       const processedReminders = reminderData.map((reminder) => {
-        const reminderId = reminder._id || reminder.id;
+        // Use salesEntry ID + nextFollowUpDate as unique identifier for reminders
+        const reminderId = reminder._id || reminder.id || `${reminder.salesEntry}_${reminder.nextFollowUpDate}`;
         return {
           ...reminder,
           _id: reminderId,
           type: reminder.type || (reminder.isOverdue ? 'overdue' : 'reminder'),
           followUpDate: reminder.nextFollowUpDate,
-          createdAt: reminder.createdAt || reminder.nextFollowUpDate,
-          isRead: readIds.includes(reminderId), // Check localStorage for read state
+          createdAt: reminder.nextFollowUpDate || reminder.createdAt,
+          isRead: reminder.isRead || false,
         };
       });
 
@@ -198,48 +177,65 @@ export const NotificationProvider = ({ children }) => {
     return combined.sort((a, b) => new Date(b.createdAt || b.nextFollowUpDate) - new Date(a.createdAt || a.nextFollowUpDate));
   }, [notifications, reminders]);
 
-  // Mark a reminder as read (persists to localStorage)
+  // Mark a reminder as read via backend API
   const markReminderAsRead = useCallback(async (reminderId) => {
     try {
       if (!reminderId) return;
       
-      // Update localStorage
-      const readIds = getReadReminderIds();
-      if (!readIds.includes(reminderId)) {
-        readIds.push(reminderId);
-        saveReadReminderIds(readIds);
-      }
-      
-      // Update local state to mark as read
+      // Update local state immediately
       setReminders((prev) =>
         prev.map((r) => (r._id === reminderId || r.id === reminderId ? { ...r, isRead: true } : r))
       );
       
-      // Also try to mark on backend (may fail if it's not a stored notification)
-      try {
-        await notificationAPI.markAsRead(reminderId);
-      } catch {
-        // Ignore backend errors for reminders - localStorage handles it
-      }
+      // Call backend API
+      await notificationAPI.markAsRead(reminderId);
     } catch (err) {
       console.error('Error marking reminder as read:', err);
     }
   }, []);
 
-  // Mark all reminders as read
-  const markAllRemindersAsRead = useCallback(() => {
-    const readIds = getReadReminderIds();
-    const allReminderIds = reminders.map(r => r._id || r.id).filter(Boolean);
-    const newReadIds = [...new Set([...readIds, ...allReminderIds])];
-    saveReadReminderIds(newReadIds);
-    
-    setReminders((prev) => prev.map((r) => ({ ...r, isRead: true })));
-  }, [reminders]);
+  // Mark all reminders as read via backend API
+  const markAllRemindersAsRead = useCallback(async () => {
+    try {
+      setReminders((prev) => prev.map((r) => ({ ...r, isRead: true })));
+      await notificationAPI.markAllAsRead();
+    } catch (err) {
+      console.error('Error marking all reminders as read:', err);
+    }
+  }, []);
 
   // Get unread reminders count
   const getUnreadRemindersCount = useCallback(() => {
     return reminders.filter((r) => !r.isRead).length;
   }, [reminders]);
+
+  // Dismiss a single reminder via backend API (for Salesperson - removes from panel)
+  const dismissReminder = useCallback(async (reminderId) => {
+    if (!reminderId) return;
+    
+    try {
+      // Remove from local state immediately
+      setReminders((prev) => prev.filter((r) => r._id !== reminderId && r.id !== reminderId));
+      
+      // Call backend API to dismiss
+      await notificationAPI.dismissReminder(reminderId);
+    } catch (err) {
+      console.error('Error dismissing reminder:', err);
+    }
+  }, []);
+
+  // Dismiss all reminders via backend API (for Salesperson - removes all from panel)
+  const dismissAllReminders = useCallback(async () => {
+    try {
+      // Clear all reminders from local state immediately
+      setReminders([]);
+      
+      // Call backend API to dismiss all
+      await notificationAPI.dismissAllReminders();
+    } catch (err) {
+      console.error('Error dismissing all reminders:', err);
+    }
+  }, []);
 
   return (
     <NotificationContext.Provider
@@ -263,6 +259,8 @@ export const NotificationProvider = ({ children }) => {
         markReminderAsRead,
         markAllRemindersAsRead,
         getUnreadRemindersCount,
+        dismissReminder,
+        dismissAllReminders,
       }}
     >
       {children}

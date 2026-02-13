@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://gold-shark-656819.hostingersite.com/api';
+const API_BASE_URL = 'https://peachpuff-boar-650004.hostingersite.com/api';
 
 // Create axios instance
 const api = axios.create({
@@ -86,6 +86,9 @@ export const notificationAPI = {
   clearRead: () => api.delete('/notifications/clear-read'),
   create: (data) => api.post('/notifications', data),
   generateOverdue: () => api.post('/notifications/generate-overdue'),
+  // Dismiss endpoints for reminders
+  dismissReminder: (id) => api.put(`/notifications/reminders/${id}/dismiss`),
+  dismissAllReminders: () => api.put('/notifications/reminders/dismiss-all'),
 };
 
 // ==================== DASHBOARD APIs ====================
