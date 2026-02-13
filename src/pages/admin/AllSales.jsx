@@ -53,10 +53,14 @@ const AllSales = () => {
     [...new Set(entries.map(e => e.requirement).filter(Boolean))].sort(),
     [entries]
   );
-  const uniqueStatuses = useMemo(() => 
-    [...new Set(entries.map(e => e.queryStatus).filter(Boolean))].sort(),
-    [entries]
-  );
+  const uniqueStatuses = useMemo(() => {
+    // Normalize status values: capitalize first letter, lowercase rest
+    const normalizedStatuses = entries
+      .map(e => e.queryStatus)
+      .filter(Boolean)
+      .map(s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase());
+    return [...new Set(normalizedStatuses)].sort();
+  }, [entries]);
 
   // Filtered entries with useMemo for performance
   const filteredEntries = useMemo(() => {
@@ -69,7 +73,7 @@ const AllSales = () => {
         salesPersonName.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesSalesPerson = salesPersonFilter === '' || salesPersonName === salesPersonFilter;
-      const matchesStatus = statusFilter === '' || entry.queryStatus === statusFilter;
+      const matchesStatus = statusFilter === '' || entry.queryStatus?.toLowerCase() === statusFilter.toLowerCase();
       const matchesRequirement = requirementFilter === '' || entry.requirement === requirementFilter;
       const matchesBranch = branchFilter === '' || entry.branch === branchFilter;
 

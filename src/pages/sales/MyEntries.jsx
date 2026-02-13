@@ -52,10 +52,14 @@ const MyEntries = () => {
     [...new Set(myEntries.map(e => e.requirement).filter(Boolean))].sort(),
     [myEntries]
   );
-  const uniqueStatuses = useMemo(() => 
-    [...new Set(myEntries.map(e => e.queryStatus).filter(Boolean))].sort(),
-    [myEntries]
-  );
+  const uniqueStatuses = useMemo(() => {
+    // Normalize status values: capitalize first letter, lowercase rest
+    const normalizedStatuses = myEntries
+      .map(e => e.queryStatus)
+      .filter(Boolean)
+      .map(s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase());
+    return [...new Set(normalizedStatuses)].sort();
+  }, [myEntries]);
 
   // Filtered entries with useMemo for performance
   const filteredEntries = useMemo(() => {
@@ -65,7 +69,7 @@ const MyEntries = () => {
         entry.contactPerson?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         entry.location?.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesStatus = statusFilter === '' || entry.queryStatus === statusFilter;
+      const matchesStatus = statusFilter === '' || entry.queryStatus?.toLowerCase() === statusFilter.toLowerCase();
       const matchesRequirement = requirementFilter === '' || entry.requirement === requirementFilter;
       const matchesBranch = branchFilter === '' || entry.branch === branchFilter;
 
@@ -89,6 +93,7 @@ const MyEntries = () => {
     warm: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'warm').length,
     cold: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'cold').length,
     closed: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'closed').length,
+    active: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'active').length,
   }), [myEntries]);
 
   const clearFilters = () => {
@@ -152,7 +157,7 @@ const MyEntries = () => {
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
           <button
             onClick={() => setStatusFilter('')}
             className={`p-4 rounded-xl text-center transition-all ${
@@ -197,6 +202,15 @@ const MyEntries = () => {
           >
             <p className="text-2xl font-bold">{stats.closed}</p>
             <p className="text-xs font-medium mt-1">Closed</p>
+          </button>
+          <button
+            onClick={() => setStatusFilter('Active')}
+            className={`p-4 rounded-xl text-center transition-all ${
+              statusFilter === 'Active' ? 'bg-teal-600 text-white shadow-lg' : 'bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <p className="text-2xl font-bold">{stats.active}</p>
+            <p className="text-xs font-medium mt-1">Active</p>
           </button>
         </div>
 

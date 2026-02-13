@@ -61,10 +61,14 @@ const Dashboard = () => {
     [...new Set(entries.map(e => e.requirement).filter(Boolean))].sort(),
     [entries]
   );
-  const uniqueStatuses = useMemo(() => 
-    [...new Set(entries.map(e => e.queryStatus).filter(Boolean))].sort(),
-    [entries]
-  );
+  const uniqueStatuses = useMemo(() => {
+    // Normalize status values: capitalize first letter, lowercase rest
+    const normalizedStatuses = entries
+      .map(e => e.queryStatus)
+      .filter(Boolean)
+      .map(s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase());
+    return [...new Set(normalizedStatuses)].sort();
+  }, [entries]);
 
   // Filtered entries
   const filteredEntries = useMemo(() => {
@@ -77,7 +81,7 @@ const Dashboard = () => {
       const matchesSalesPerson = salesPersonFilter === '' || salesPersonName === salesPersonFilter;
       const matchesBranch = branchFilter === '' || entry.branch === branchFilter;
       const matchesRequirement = requirementFilter === '' || entry.requirement === requirementFilter;
-      const matchesStatus = statusFilter === '' || entry.queryStatus === statusFilter;
+      const matchesStatus = statusFilter === '' || entry.queryStatus?.toLowerCase() === statusFilter.toLowerCase();
       return matchesSearch && matchesSalesPerson && matchesBranch && matchesRequirement && matchesStatus;
     });
   }, [entries, searchTerm, salesPersonFilter, branchFilter, requirementFilter, statusFilter]);

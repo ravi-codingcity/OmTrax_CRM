@@ -17,20 +17,23 @@ const Header = () => {
     markAsRead, 
     markAllAsRead,
     markReminderAsRead,
-    getUnreadRemindersCount,
+    markAllRemindersAsRead,
   } = useNotifications();
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = useRef(null);
 
-  // Combine notifications and reminders, sorted by date
+  // Combine notifications and reminders, sorted by date (newest first), limit to 20
   const allNotifications = useMemo(() => {
     const combined = [...notifications, ...reminders];
-    return combined.sort((a, b) => {
+    // Sort by date descending (latest first)
+    const sorted = combined.sort((a, b) => {
       const dateA = new Date(a.createdAt || a.nextFollowUpDate);
       const dateB = new Date(b.createdAt || b.nextFollowUpDate);
       return dateB - dateA;
     });
+    // Limit to 20 notifications
+    return sorted.slice(0, 20);
   }, [notifications, reminders]);
 
   // Total badge count (unread notifications + unread reminders)
@@ -89,22 +92,25 @@ const Header = () => {
 
   const handleMarkAllAsRead = async () => {
     await markAllAsRead();
-    // Also mark all reminders as read
-    for (const r of reminders) {
-      if (!r.isRead) {
-        await markReminderAsRead(r._id);
-      }
-    }
+    // Also mark all reminders as read using the new function
+    markAllRemindersAsRead();
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
     return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
   const formatFollowUpDate = (dateString) => {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    if (isNaN(date.getTime())) return 'N/A';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
   };
 
   const renderNotificationContent = (notification) => {
@@ -132,6 +138,25 @@ const Header = () => {
           <p className="text-xs text-gray-500 mt-0.5">
             Due: {formatFollowUpDate(notification.nextFollowUpDate || notification.followUpDate || notification.salesEntry?.nextFollowUpDate)}
             {isAdmin() && <span className="ml-2">• {getSalesPersonName()}</span>}
+          </p>
+        </>
+      );
+    }
+
+    // New sales entry notification (Admin only)
+    if (notification.type === 'new_entry' || notification.type === 'sales_entry') {
+      return (
+        <>
+          <p className="text-sm text-gray-800">
+            <span className="font-semibold text-green-600">📋 New Entry</span>
+            <span className="text-gray-600"> added by </span>
+            <span className="font-medium">{getSalesPersonName()}</span>
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Company: {notification.companyName || notification.salesEntry?.companyName}
+          </p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Status: {notification.queryStatus || notification.salesEntry?.queryStatus || 'N/A'}
           </p>
         </>
       );
@@ -250,23 +275,33 @@ const Header = () => {
                         <p className="text-sm text-gray-500">No notifications yet</p>
                       </div>
                     ) : (
-                      allNotifications.slice(0, 10).map((notification) => (
+                      allNotifications.map((notification) => (
                         <div
                           key={notification._id}
                           onClick={() => handleNotificationClick(notification)}
                           className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-all hover:bg-gray-50 ${
-                            !notification.isRead ? 'bg-blue-50/50' : ''
-                          } ${notification.type === 'overdue' && !notification.isRead ? 'bg-orange-50/50' : ''} ${notification.type === 'reminder' && !notification.isRead ? 'bg-yellow-50/50' : ''}`}
+                            !notification.isRead 
+                              ? notification.type === 'overdue' 
+                                ? 'bg-orange-50/50' 
+                                : notification.type === 'reminder' 
+                                  ? 'bg-yellow-50/50' 
+                                  : (notification.type === 'new_entry' || notification.type === 'sales_entry')
+                                    ? 'bg-green-50/50'
+                                    : 'bg-blue-50/50'
+                              : 'bg-white'
+                          }`}
                         >
                           <div className="flex items-start gap-3">
                             <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
-                              notification.type === 'overdue' && !notification.isRead
-                                ? 'bg-orange-500'
-                                : notification.type === 'reminder' && !notification.isRead
-                                  ? 'bg-yellow-500'
-                                  : !notification.isRead
-                                    ? 'bg-blue-500' 
-                                    : 'bg-gray-300'
+                              !notification.isRead
+                                ? notification.type === 'overdue'
+                                  ? 'bg-orange-500'
+                                  : notification.type === 'reminder'
+                                    ? 'bg-yellow-500'
+                                    : (notification.type === 'new_entry' || notification.type === 'sales_entry')
+                                      ? 'bg-green-500'
+                                      : 'bg-blue-500' 
+                                : 'bg-gray-300'
                             }`}></div>
                             <div className="flex-1 min-w-0">
                               {renderNotificationContent(notification)}

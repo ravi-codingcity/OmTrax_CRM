@@ -47,7 +47,6 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
       Closed: 'bg-green-100 text-green-700',
       New: 'bg-purple-100 text-purple-700',
       Active: 'bg-teal-100 text-teal-700',
-      Live: 'bg-emerald-100 text-emerald-700',
     };
     return badges[normalizedStatus] || 'bg-gray-100 text-gray-700';
   };
