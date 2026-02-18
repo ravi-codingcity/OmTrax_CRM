@@ -106,7 +106,7 @@ const NewEntry = () => {
     <MainLayout>
       <div className="max-w-4xl mx-auto">
         {/* Page Header */}
-        <div className="mb-4">
+        <div className="hidden sm:block mb-4">
           <h1 className="text-lg sm:text-xl font-bold text-gray-800">New Sales Entry</h1>
           <p className="text-gray-500 text-xs mt-0.5">
             Add a new sales lead to the system

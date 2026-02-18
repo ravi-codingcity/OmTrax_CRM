@@ -115,7 +115,7 @@ const SalesAnalytics = () => {
     <MainLayout>
       <div className="space-y-4 sm:space-y-6">
         {/* Page Header */}
-        <div>
+        <div className='hidden sm:block'>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">My Analytics</h1>
           <p className="text-gray-500 text-xs sm:text-sm mt-1">Track your performance and insights</p>
         </div>

@@ -99,7 +99,7 @@ const AdminNewEntry = () => {
     <MainLayout>
       <div className="max-w-4xl mx-auto">
         {/* Page Header */}
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="mb-4 hidden sm:flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h1 className="text-lg sm:text-xl font-bold text-gray-800">Add New Sales Entry</h1>
             <p className="text-gray-500 text-xs mt-0.5">Admin - Add a new sales lead to the system</p>
@@ -139,7 +139,7 @@ const AdminNewEntry = () => {
         <div className="bg-white rounded-xl shadow-sm p-3 sm:p-4">
           <form onSubmit={handleSubmit}>
             {/* User Info Display */}
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex flex-row sm:flex-row justify-between sm:items-center gap-2 sm:gap-6">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-gray-600">Sales Person:</span>
                 <span className="text-sm font-semibold text-gray-800">{user?.name}</span>

@@ -11,6 +11,7 @@ const AllSales = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [entries, setEntries] = useState([]);
+  const [deleteSuccessMessage, setDeleteSuccessMessage] = useState('');
   
   // Filter states (consistent with Dashboard)
   const [searchTerm, setSearchTerm] = useState('');
@@ -118,15 +119,42 @@ const AllSales = () => {
   const handleDelete = async (entry) => {
     const result = await deleteSalesEntry(entry._id || entry.id);
     if (result.success) {
+      setDeleteSuccessMessage(`"${entry.companyName}" deleted successfully`);
       await fetchSalesEntries();
+      // Auto-dismiss after 3 seconds
+      setTimeout(() => {
+        setDeleteSuccessMessage('');
+      }, 3000);
     }
   };
 
   return (
     <MainLayout>
       <div className="space-y-4 sm:space-y-6">
+        {/* Mobile Delete Success Toast */}
+        {deleteSuccessMessage && (
+          <div className="md:hidden fixed top-16 left-3 right-3 z-50 animate-[slideDown_0.3s_ease-out]">
+            <div className="bg-green-500 text-white px-4 py-3 rounded-xl shadow-lg flex items-center justify-between">
+              <div className="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm font-medium">{deleteSuccessMessage}</span>
+              </div>
+              <button
+                onClick={() => setDeleteSuccessMessage('')}
+                className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="hidden sm:flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-800">All Sales Entries</h1>
             <p className="text-gray-500 text-xs sm:text-sm mt-1">
