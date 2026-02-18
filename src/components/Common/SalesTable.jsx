@@ -1,4 +1,23 @@
-const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFollowUp = null, onAddFollowUp = null }) => {
+import { useState } from 'react';
+
+const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFollowUp = null, onAddFollowUp = null, onDelete = null, isAdmin = false }) => {
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, entry: null });
+
+  const handleDeleteClick = (entry) => {
+    setDeleteConfirm({ show: true, entry });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (deleteConfirm.entry && onDelete) {
+      await onDelete(deleteConfirm.entry);
+    }
+    setDeleteConfirm({ show: false, entry: null });
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirm({ show: false, entry: null });
+  };
+
   // Format date from ISO or YYYY-MM-DD to DD-MM-YYYY
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
@@ -73,12 +92,13 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="bg-gray-100">
-            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Date</th>
-            {showSalesPerson && (
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Sales Rep</th>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse min-w-[800px]">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300 whitespace-nowrap">Date</th>
+              {showSalesPerson && (
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300 whitespace-nowrap">Sales Rep</th>
             )}
             <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Company</th>
             <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Contact Person</th>
@@ -86,8 +106,8 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
             <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Remark</th>
             <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Next Follow-up</th>
             <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Status</th>
-            {(onEdit || onViewFollowUp || onAddFollowUp) && (
-              <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300 w-28">Actions</th>
+            {(onEdit || onViewFollowUp || onAddFollowUp || (isAdmin && onDelete)) && (
+              <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300 w-32">Actions</th>
             )}
           </tr>
         </thead>
@@ -126,7 +146,7 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
                   {capitalizeStatus(entry.queryStatus)}
                 </span>
               </td>
-              {(onEdit || onViewFollowUp || onAddFollowUp) && (
+              {(onEdit || onViewFollowUp || onAddFollowUp || (isAdmin && onDelete)) && (
                 <td className="px-3 py-2.5 border-b border-gray-200 align-middle text-center">
                   <div className="flex items-center justify-center gap-1">
                     {onViewFollowUp && (
@@ -168,6 +188,17 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
                         </svg>
                       </button>
                     )}
+                    {isAdmin && onDelete && (
+                      <button
+                        onClick={() => handleDeleteClick(entry)}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Delete Entry"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </td>
               )}
@@ -175,6 +206,36 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
           ))}
         </tbody>
       </table>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.show && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 transform transition-all">
+            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full bg-red-100">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">Delete Entry</h3>
+            <p className="text-sm text-gray-600 text-center mb-6">Are you sure you want to delete this?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDeleteCancel}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

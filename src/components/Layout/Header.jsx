@@ -262,18 +262,20 @@ const Header = () => {
   const links = isAdmin() ? adminLinks : salesLinks;
 
   return (
+    <>
     <header className="bg-gradient-to-r from-blue-100 via-white to-blue-200 border-b border-gray-300/80 sticky top-0 z-50 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6">
         <div className="flex items-center justify-between h-14">
+
           {/* Logo & Brand */}
           <div className="flex items-center space-x-3">
             <div>
-                <img src={omtrax_logo} alt="OmTrax Logo" className="h-9 w-auto" />
+                <img src={omtrax_logo} alt="OmTrax Logo" className="h-8 sm:h-9 w-auto" />
             </div>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex items-center space-x-1 bg-white/60 backdrop-blur-sm px-1.5 py-1 rounded-xl border border-gray-100">
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center space-x-1 bg-white/60 backdrop-blur-sm px-1.5 py-1 rounded-xl border border-gray-100">
             {links.map((link) => (
               <NavLink
                 key={link.to}
@@ -289,13 +291,13 @@ const Header = () => {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d={link.icon} />
                 </svg>
-                <span className="hidden md:inline">{link.label}</span>
+                <span>{link.label}</span>
               </NavLink>
             ))}
           </nav>
 
           {/* User Info & Logout */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 sm:space-x-2">
             {/* Notification Bell - Available for all users */}
             <div className="relative" ref={notificationRef}>
               <button
@@ -315,7 +317,7 @@ const Header = () => {
 
               {/* Notification Dropdown */}
               {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
+                <div className="fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto mt-2 sm:w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden max-h-[80vh] sm:max-h-none">
                   <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-blue-100 border-b border-gray-200 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-gray-800">Notifications</h3>
                     {totalBadgeCount > 0 && (
@@ -404,7 +406,7 @@ const Header = () => {
             </div>
             <button
               onClick={handleLogout}
-              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200"
+              className="hidden md:block p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200"
               title="Logout"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -415,6 +417,52 @@ const Header = () => {
         </div>
       </div>
     </header>
+
+    {/* Mobile Bottom Navigation Bar */}
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] rounded-t-2xl">
+      <div className="flex items-center justify-around px-2 py-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        {links.map((link) => (
+          <NavLink
+            key={link.to}
+            to={link.to}
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center py-2 px-3 rounded-xl transition-all duration-200 min-w-[60px] ${
+                isActive
+                  ? 'text-blue-600 bg-blue-50'
+                  : 'text-gray-500 hover:text-blue-600 hover:bg-gray-50'
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <div className={`p-1.5 rounded-xl transition-all duration-200 ${isActive ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md' : ''}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d={link.icon} />
+                  </svg>
+                </div>
+                <span className={`text-[10px] mt-0.5 font-medium ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
+                  {link.label}
+                </span>
+              </>
+            )}
+          </NavLink>
+        ))}
+        
+        {/* Logout Button in Bottom Nav */}
+        <button
+          onClick={handleLogout}
+          className="flex flex-col items-center justify-center py-2 px-3 rounded-xl transition-all duration-200 min-w-[60px] text-gray-500 hover:text-red-500 hover:bg-red-50"
+        >
+          <div className="p-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </div>
+          <span className="text-[10px] mt-0.5 font-medium">Logout</span>
+        </button>
+      </div>
+    </nav>
+    </>
   );
 };
 

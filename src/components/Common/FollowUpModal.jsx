@@ -154,20 +154,20 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-500 to-blue-600 px-5 py-4 text-white">
+        <div className="bg-gradient-to-r from-indigo-500 to-blue-600 px-3 sm:px-5 py-3 sm:py-4 text-white">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">
+            <div className="min-w-0 flex-1 mr-2">
+              <h2 className="text-base sm:text-lg font-semibold">
                 {mode === 'add' ? 'Add Follow-Up' : 'Follow-Up History'}
               </h2>
-              <p className="text-indigo-100 text-sm">{entry?.companyName} - {entry?.contactPerson}</p>
+              <p className="text-indigo-100 text-xs sm:text-sm truncate">{entry?.companyName} - {entry?.contactPerson}</p>
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -176,16 +176,16 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
           </div>
         </div>
 
-        <div className="p-5 overflow-y-auto max-h-[calc(90vh-180px)]">
+        <div className="p-3 sm:p-5 overflow-y-auto max-h-[calc(90vh-180px)]">
           {/* Current Status */}
-          <div className="bg-gray-50 rounded-lg p-3 mb-4 flex items-center justify-between">
-            <div className="text-sm">
+          <div className="bg-gray-50 rounded-lg p-2 sm:p-3 mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="text-xs sm:text-sm">
               <span className="text-gray-500">Current Status:</span>
               <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(entry?.queryStatus)}`}>
                 {capitalizeStatus(entry?.queryStatus)}
               </span>
             </div>
-            <div className="text-sm">
+            <div className="text-xs sm:text-sm">
               <span className="text-gray-500">Next Follow-up:</span>
               <span className="ml-2 font-medium text-gray-800">{formatDate(entry?.nextFollowUpDate)}</span>
             </div>
@@ -193,31 +193,31 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
 
           {/* Add New Follow-Up Form */}
           {(mode === 'add' || mode === 'both') && (
-            <form onSubmit={handleSubmit} className="bg-blue-50 rounded-lg p-4 mb-4 border border-blue-100">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+            <form onSubmit={handleSubmit} className="bg-blue-50 rounded-lg p-3 sm:p-4 mb-4 border border-blue-100">
+              <h3 className="text-xs sm:text-sm font-semibold text-gray-700 mb-3 flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
                 Add New Follow-Up
               </h3>
-              <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Next Follow-Up Date *</label>
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">Next Follow-Up Date *</label>
                   <input
                     type="date"
                     value={newFollowUp.nextFollowUpDate}
                     onChange={(e) => setNewFollowUp({ ...newFollowUp, nextFollowUpDate: e.target.value })}
                     min={new Date().toISOString().split('T')[0]}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Update Status</label>
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">Update Status</label>
                   <select
                     value={newFollowUp.status}
                     onChange={(e) => setNewFollowUp({ ...newFollowUp, status: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="Cold">Cold</option>
                     <option value="Warm">Warm</option>
@@ -229,12 +229,12 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
                 </div>
               </div>
               <div className="mb-3">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Remark *</label>
+                <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">Remark *</label>
                 <textarea
                   value={newFollowUp.remark}
                   onChange={(e) => setNewFollowUp({ ...newFollowUp, remark: e.target.value })}
                   rows={2}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                   placeholder="Enter follow-up notes..."
                   required
                 />

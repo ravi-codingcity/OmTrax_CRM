@@ -7,7 +7,7 @@ import SalesTable from '../../components/Common/SalesTable';
 import FollowUpModal from '../../components/Common/FollowUpModal';
 
 const AllSales = () => {
-  const { salesEntries, loading, fetchSalesEntries, addFollowUp } = useSales();
+  const { salesEntries, loading, fetchSalesEntries, addFollowUp, deleteSalesEntry } = useSales();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [entries, setEntries] = useState([]);
@@ -115,20 +115,27 @@ const AllSales = () => {
     setSelectedEntry(null);
   };
 
+  const handleDelete = async (entry) => {
+    const result = await deleteSalesEntry(entry._id || entry.id);
+    if (result.success) {
+      await fetchSalesEntries();
+    }
+  };
+
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Page Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">All Sales Entries</h1>
-            <p className="text-gray-500 text-sm mt-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">All Sales Entries</h1>
+            <p className="text-gray-500 text-xs sm:text-sm mt-1">
               {loading ? 'Loading...' : `Showing ${filteredEntries.length} of ${entries.length} entries`}
             </p>
           </div>
           <button
             onClick={() => navigate('/admin/new-entry')}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm w-full sm:w-auto"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -221,43 +228,45 @@ const AllSales = () => {
         <SalesTable 
           entries={paginatedEntries} 
           onViewFollowUp={handleViewFollowUp}
+          onDelete={handleDelete}
+          isAdmin={true}
         />
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between bg-white rounded-lg shadow-sm px-4 py-3 border border-gray-100">
-            <div className="text-sm text-gray-600">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white rounded-lg shadow-sm px-3 sm:px-4 py-3 border border-gray-100">
+            <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
               Showing {startIndex + 1} to {Math.min(startIndex + entriesPerPage, filteredEntries.length)} of {filteredEntries.length} entries
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center">
               <button
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 First
               </button>
               <button
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-2 sm:px-3 py-1 text-xs sm:text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Previous
+                Prev
               </button>
-              <span className="px-3 py-1 text-sm font-medium text-gray-700">
-                Page {currentPage} of {totalPages}
+              <span className="px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium text-gray-700">
+                {currentPage}/{totalPages}
               </span>
               <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-2 sm:px-3 py-1 text-xs sm:text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>
               <button
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Last
               </button>

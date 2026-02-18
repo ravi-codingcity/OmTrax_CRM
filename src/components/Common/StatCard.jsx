@@ -11,15 +11,15 @@ const StatCard = ({ title, value, icon, color, subtext }) => {
   };
 
   return (
-    <div className={`bg-gradient-to-br ${colorClasses[color] || colorClasses.blue} rounded-xl p-4 text-white shadow-lg`}>
+    <div className={`bg-gradient-to-br ${colorClasses[color] || colorClasses.blue} rounded-xl p-2 sm:p-4 text-white shadow-lg`}>
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-white/80 text-xs font-medium uppercase tracking-wide">{title}</p>
-          <p className="text-2xl font-bold mt-1">{value}</p>
-          {subtext && <p className="text-white/70 text-xs mt-1">{subtext}</p>}
+          <p className="text-white/80 text-[10px] sm:text-xs font-medium uppercase tracking-wide">{title}</p>
+          <p className="text-lg sm:text-2xl font-bold mt-1">{value}</p>
+          {subtext && <p className="text-white/70 text-[10px] sm:text-xs mt-1">{subtext}</p>}
         </div>
-        <div className="bg-white/20 p-2.5 rounded-lg">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="bg-white/20 p-1.5 sm:p-2.5 rounded-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
           </svg>
         </div>

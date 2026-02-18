@@ -92,17 +92,16 @@ const AdminNewEntry = () => {
   };
 
   const inputClasses = (fieldName) =>
-    `w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${
-      errors[fieldName] ? 'border-red-300 bg-red-50' : 'border-gray-300'
+    `w-full px-3 py-2.5 sm:py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${errors[fieldName] ? 'border-red-300 bg-red-50' : 'border-gray-300'
     }`;
 
   return (
     <MainLayout>
       <div className="max-w-4xl mx-auto">
         {/* Page Header */}
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h1 className="text-xl font-bold text-gray-800">Add New Sales Entry</h1>
+            <h1 className="text-lg sm:text-xl font-bold text-gray-800">Add New Sales Entry</h1>
             <p className="text-gray-500 text-xs mt-0.5">Admin - Add a new sales lead to the system</p>
           </div>
           <button
@@ -137,10 +136,10 @@ const AdminNewEntry = () => {
         )}
 
         {/* Form Card */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-xl shadow-sm p-3 sm:p-4">
           <form onSubmit={handleSubmit}>
             {/* User Info Display */}
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-6">
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-gray-600">Sales Person:</span>
                 <span className="text-sm font-semibold text-gray-800">{user?.name}</span>
@@ -152,7 +151,7 @@ const AdminNewEntry = () => {
             </div>
 
             {/* Form Fields */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-3">
               {/* Company Name */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -314,32 +313,32 @@ const AdminNewEntry = () => {
               </div>
 
               {/* Remark - Full Width */}
-              <div className="col-span-2 md:col-span-3">
+              <div className="sm:col-span-2 md:col-span-3">
                 <label className="block text-xs font-medium text-gray-700 mb-1">Remark</label>
                 <textarea
                   name="remark"
                   value={formData.remark}
                   onChange={handleChange}
                   rows={2}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
+                  className="w-full px-3 py-2.5 sm:py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
                   placeholder="Additional remarks or notes..."
                 />
               </div>
             </div>
 
             {/* Submit Button */}
-            <div className="mt-4 flex justify-end space-x-2">
+            <div className="mt-5 sm:mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:space-x-2 sm:gap-0">
               <button
                 type="button"
                 onClick={() => navigate('/admin/sales')}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                className="w-full sm:w-auto px-4 py-2.5 sm:py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-sm"
+                className="w-full sm:w-auto px-4 py-2.5 sm:py-1.5 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-sm"
               >
                 {isSubmitting ? (
                   <>
