@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import SalesTable from '../../components/Common/SalesTable';
 import FollowUpModal from '../../components/Common/FollowUpModal';
+import PullToRefresh from '../../components/Common/PullToRefresh';
 
 const AllSales = () => {
   const { salesEntries, loading, fetchSalesEntries, addFollowUp, deleteSalesEntry } = useSales();
@@ -130,6 +131,7 @@ const AllSales = () => {
 
   return (
     <MainLayout>
+      <PullToRefresh onRefresh={loadData} disabled={loading}>
       <div className="space-y-4 sm:space-y-6">
         {/* Mobile Delete Success Toast */}
         {deleteSuccessMessage && (
@@ -313,6 +315,7 @@ const AllSales = () => {
           />
         )}
       </div>
+      </PullToRefresh>
     </MainLayout>
   );
 };

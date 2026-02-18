@@ -4,6 +4,7 @@ import { useSales } from '../../context/SalesContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import SalesTable from '../../components/Common/SalesTable';
 import FollowUpModal from '../../components/Common/FollowUpModal';
+import PullToRefresh from '../../components/Common/PullToRefresh';
 
 const MyEntries = () => {
   const { user } = useAuth();
@@ -128,6 +129,7 @@ const MyEntries = () => {
 
   return (
     <MainLayout>
+      <PullToRefresh onRefresh={loadData} disabled={loading}>
       <div className="space-y-4 sm:space-y-6">
         {/* Page Header */}
         <div className="hidden sm:flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -347,6 +349,7 @@ const MyEntries = () => {
           />
         )}
       </div>
+      </PullToRefresh>
     </MainLayout>
   );
 };

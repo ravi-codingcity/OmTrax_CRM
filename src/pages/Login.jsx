@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import omtrax_logo from '../assets/omtrax_logo.png';
+import omtrax_logo from '../assets/OmTrax.png';
 
 const Login = () => {
   const [username, setUsername] = useState('');

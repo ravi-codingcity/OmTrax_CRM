@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useNavigate, NavLink } from 'react-router-dom';
-import omtrax_logo from '../../assets/omtrax_logo.png';
+import omtrax_logo from '../../assets/OmTrax.png';
 
 const Header = () => {
   const { user, logout, isAdmin } = useAuth();

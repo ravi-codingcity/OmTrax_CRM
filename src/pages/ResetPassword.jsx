@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authAPI } from '../services/api';
-import omtrax_logo from '../assets/omtrax_logo.png';
+import omtrax_logo from '../assets/OmTrax.png';
 
 const ResetPassword = () => {
   const navigate = useNavigate();

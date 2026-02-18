@@ -5,6 +5,7 @@ import MainLayout from '../../components/Layout/MainLayout';
 import StatCard from '../../components/Common/StatCard';
 import SalesTable from '../../components/Common/SalesTable';
 import FollowUpModal from '../../components/Common/FollowUpModal';
+import PullToRefresh from '../../components/Common/PullToRefresh';
 
 const Dashboard = () => {
   const { salesEntries, stats, loading, fetchSalesEntries, getStats, addFollowUp, updateSalesEntry } = useSales();
@@ -166,6 +167,7 @@ const Dashboard = () => {
 
   return (
     <MainLayout>
+      <PullToRefresh onRefresh={loadData} disabled={loading}>
       <div className="space-y-6">
         {/* Page Header */}
         <div className="hidden sm:flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -676,6 +678,7 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+      </PullToRefresh>
     </MainLayout>
   );
 };
