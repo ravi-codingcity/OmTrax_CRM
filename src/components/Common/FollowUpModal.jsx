@@ -88,28 +88,6 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
         setLoadingHistory(false);
       }
 
-      // Add initial entry remark as first history item if it exists and not already in history
-      if (entry?.remark && entry.remark.trim()) {
-        const initialRemarkExists = historyData.some(
-          item => item.isInitialRemark || 
-          (item.remark === entry.remark && !item.followUpDate && !item.nextFollowUpDate)
-        );
-        
-        if (!initialRemarkExists) {
-          const initialRemark = {
-            _id: 'initial-' + entryId,
-            remark: entry.remark,
-            status: entry.queryStatus,
-            followUpDate: entry.createdAt || entry.date,
-            createdAt: entry.createdAt || entry.date,
-            nextFollowUpDate: entry.nextFollowUpDate,
-            addedByName: entry.salesPersonName || entry.salesPerson?.name || 'Sales Person',
-            isInitialRemark: true,
-          };
-          historyData = [...historyData, initialRemark];
-        }
-      }
-
       setFollowUpHistory(historyData);
     };
 
@@ -265,7 +243,7 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              History ({followUpHistory.length} entries)
+              History ({followUpHistory.length + (entry?.remark ? 1 : 0)} entries)
             </h3>
 
             {loadingHistory ? (
@@ -276,7 +254,7 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
                 </svg>
                 <p className="text-sm">Loading history...</p>
               </div>
-            ) : followUpHistory.length === 0 ? (
+            ) : followUpHistory.length === 0 && !entry?.remark ? (
               <div className="text-center py-6 text-gray-400">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -285,39 +263,30 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
               </div>
             ) : (
               <div className="space-y-3">
+                {/* Actual follow-ups from API, sorted newest first */}
                 {[...followUpHistory]
                   .sort((a, b) => {
                     const dateA = new Date(a.followUpDate || a.createdAt || a.date || 0);
                     const dateB = new Date(b.followUpDate || b.createdAt || b.date || 0);
-                    return dateB - dateA; // Newest first
+                    return dateB - dateA;
                   })
-                  .map((followUp, index, sortedArray) => {
+                  .map((followUp, index) => {
                     const isLatest = index === 0;
-                    const isInitial = followUp.isInitialRemark;
-                    
                     return (
-                      <div 
-                        key={followUp._id || followUp.id || index} 
+                      <div
+                        key={followUp._id || followUp.id || index}
                         className={`bg-white border rounded-lg p-3 relative ${
-                          isLatest 
-                            ? 'border-indigo-300 bg-indigo-50/50 ring-1 ring-indigo-200' 
-                            : isInitial
-                              ? 'border-green-300 bg-green-50/50'
-                              : 'border-gray-200'
+                          isLatest
+                            ? 'border-indigo-300 bg-indigo-50/50 ring-1 ring-indigo-200'
+                            : 'border-gray-200'
                         }`}
                       >
-                        {/* Badge for entry type */}
-                        {isLatest && !isInitial && (
+                        {isLatest && (
                           <div className="absolute -top-2 left-3 px-2 py-0.5 bg-indigo-500 text-white text-[10px] font-semibold rounded-full">
                             Latest
                           </div>
                         )}
-                        {isInitial && (
-                          <div className={`absolute -top-2 left-3 px-2 py-0.5 ${isLatest ? 'bg-indigo-500' : 'bg-green-500'} text-white text-[10px] font-semibold rounded-full`}>
-                            {isLatest ? 'Latest • Initial Entry' : 'Initial Entry'}
-                          </div>
-                        )}
-                        <div className={`flex items-start justify-between mb-2 ${(isLatest || isInitial) ? 'mt-1' : ''}`}>
+                        <div className={`flex items-start justify-between mb-2 ${isLatest ? 'mt-1' : ''}`}>
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-medium text-gray-800">{formatDate(followUp.followUpDate || followUp.createdAt || followUp.date)}</span>
                             {followUp.status && (
@@ -328,7 +297,6 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
                           </div>
                           <span className="text-xs text-gray-500">by {getAddedByName(followUp)}</span>
                         </div>
-                        {/* Full remark display - no truncation */}
                         <div className="text-sm text-gray-600 whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
                           {followUp.remark || '-'}
                         </div>
@@ -341,6 +309,32 @@ const FollowUpModal = ({ entry, onClose, onAddFollowUp, mode = 'view', currentUs
                       </div>
                     );
                   })}
+
+                {/* Initial Entry — always shown at the bottom from entry.remark */}
+                {entry?.remark && (
+                  <div className="bg-white border border-green-300 rounded-lg p-3 relative" style={{backgroundColor: 'rgb(240 253 244 / 0.5)'}}>
+                    <div className="absolute -top-2 left-3 px-2 py-0.5 bg-green-600 text-white text-[10px] font-semibold rounded-full">
+                      Initial Entry
+                    </div>
+                    <div className="flex items-start justify-between mb-2 mt-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-800">{formatDate(entry.createdAt || entry.date)}</span>
+                        {entry.queryStatus && (
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${getStatusBadge(entry.queryStatus)}`}>
+                            {capitalizeStatus(entry.queryStatus)}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-500">by {entry.salesPersonName || entry.salesPerson?.name || 'Sales Person'}</span>
+                    </div>
+                    <div className="text-sm text-gray-600 whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
+                      {entry.remark}
+                    </div>
+                    <div className="mt-2 text-xs text-gray-400">
+                      Next follow-up: {formatDate(entry.nextFollowUpDate)}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

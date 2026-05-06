@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { SalesProvider } from './context/SalesContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { SalesVisitProvider } from './context/SalesVisitContext';
 import ProtectedRoute from './components/Common/ProtectedRoute';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -13,12 +14,14 @@ import AdminNewEntry from './pages/admin/AdminNewEntry';
 import NewEntry from './pages/sales/NewEntry';
 import MyEntries from './pages/sales/MyEntries';
 import SalesAnalytics from './pages/sales/SalesAnalytics';
+import SalesVisit from './pages/SalesVisit';
 
 function App() {
   return (
     <AuthProvider>
       <NotificationProvider>
         <SalesProvider>
+          <SalesVisitProvider>
           <Router>
             <Routes>
               {/* Public Routes */}
@@ -86,6 +89,16 @@ function App() {
                 }
               />
 
+              {/* Sales Visit - Accessible by both Admin and Salesperson */}
+              <Route
+                path="/sales-visit"
+                element={
+                  <ProtectedRoute>
+                    <SalesVisit />
+                  </ProtectedRoute>
+                }
+              />
+
               {/* Redirect root to login */}
               <Route path="/" element={<Navigate to="/login" replace />} />
               
@@ -93,6 +106,7 @@ function App() {
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           </Router>
+          </SalesVisitProvider>
         </SalesProvider>
       </NotificationProvider>
     </AuthProvider>

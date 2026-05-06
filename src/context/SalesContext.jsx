@@ -153,7 +153,6 @@ export const SalesProvider = ({ children }) => {
           if (entry._id === salesEntryId || entry.id === salesEntryId) {
             return {
               ...entry,
-              remark: followUpData.remark,
               nextFollowUpDate: followUpData.nextFollowUpDate,
               queryStatus: followUpData.status || entry.queryStatus,
               followUpHistory: [...(entry.followUpHistory || []), newFollowUp],

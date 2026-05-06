@@ -99,6 +99,30 @@ export const dashboardAPI = {
   getSalespersonPerformance: () => api.get('/dashboard/salesperson-performance'),
 };
 
+// ==================== SALES VISIT APIs ====================
+export const salesVisitAPI = {
+  getAll: (params = {}) => api.get('/sales-visits', { params }),
+  getById: (id) => api.get(`/sales-visits/${id}`),
+  create: (data) => {
+    // Send JSON with base64 image - longer timeout for large images
+    return api.post('/sales-visits', {
+      companyName: data.companyName,
+      location: data.location,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      date: data.date,  // YYYY-MM-DD
+      time: data.time,  // HH:mm
+      imageBase64: data.imageBase64,
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      timeout: 120000,  // 2 minutes timeout for large image uploads
+    });
+  },
+  delete: (id) => api.delete(`/sales-visits/${id}`),
+};
+
 // ==================== BRANCH APIs ====================
 export const branchAPI = {
   getAll: () => api.get('/branches'),
