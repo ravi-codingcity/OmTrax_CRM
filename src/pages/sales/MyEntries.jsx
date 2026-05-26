@@ -25,6 +25,10 @@ const MyEntries = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const entriesPerPage = 15;
 
+  // Download modal state
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [downloadFilter, setDownloadFilter] = useState('Total');
+
   // Load data on mount
   const loadData = useCallback(async () => {
     await fetchSalesEntries();
@@ -127,6 +131,106 @@ const MyEntries = () => {
     setFollowUpEntry(null);
   };
 
+  const handleDownloadExcel = () => {
+    const entriesToExport =
+      downloadFilter === 'Total'
+        ? myEntries
+        : myEntries.filter(
+            (e) => e.queryStatus?.toLowerCase() === downloadFilter.toLowerCase()
+          );
+
+    if (!entriesToExport.length) {
+      setSuccessMessage(`No ${downloadFilter} entries available to download.`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+      return;
+    }
+
+    const formatDate = (dateStr) => {
+      if (!dateStr) return '';
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      return `${day}-${month}-${d.getFullYear()}`;
+    };
+
+    const escapeCsv = (val) => {
+      if (val === null || val === undefined) return '';
+      const s = String(val).replace(/"/g, '""');
+      return /[",\n\r]/.test(s) ? `"${s}"` : s;
+    };
+
+    const headers = [
+      'S.No',
+      'Company Name',
+      'Contact Person',
+      'Designation',
+      'Contact Number',
+      'Email',
+      'Requirement',
+      'Location',
+      'Branch',
+      'Query Status',
+      'Remark',
+      'Next Follow-Up Date',
+      'Follow-Ups Count',
+      'Created Date',
+    ];
+
+    const rows = entriesToExport.map((entry, idx) => [
+      idx + 1,
+      entry.companyName,
+      entry.contactPerson,
+      entry.designation,
+      entry.contactNumber,
+      entry.contactEmail,
+      entry.requirement,
+      entry.location,
+      entry.branch,
+      entry.queryStatus
+        ? entry.queryStatus.charAt(0).toUpperCase() + entry.queryStatus.slice(1).toLowerCase()
+        : '',
+      entry.remark,
+      formatDate(entry.nextFollowUpDate),
+      entry.followUpHistory?.length || entry.followUps?.length || 0,
+      formatDate(entry.createdAt),
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map(escapeCsv).join(','))
+      .join('\r\n');
+
+    // UTF-8 BOM so Excel renders unicode characters correctly
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const today = new Date();
+    const stamp = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const safeName = (user?.name || 'salesperson').replace(/[^a-zA-Z0-9]+/g, '_');
+    link.href = url;
+    link.download = `MyEntries_${safeName}_${downloadFilter}_${stamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setSuccessMessage(
+      `Downloaded ${entriesToExport.length} ${downloadFilter} ${entriesToExport.length === 1 ? 'entry' : 'entries'} successfully!`
+    );
+    setTimeout(() => setSuccessMessage(''), 3000);
+    setShowDownloadModal(false);
+  };
+
+  // Per-status counts for the download modal
+  const downloadCounts = useMemo(() => ({
+    Total: myEntries.length,
+    Hot: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'hot').length,
+    Warm: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'warm').length,
+    Cold: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'cold').length,
+    Closed: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'closed').length,
+    Active: myEntries.filter((e) => e.queryStatus?.toLowerCase() === 'active').length,
+  }), [myEntries]);
+
   return (
     <MainLayout>
       <PullToRefresh onRefresh={loadData} disabled={loading}>
@@ -137,15 +241,31 @@ const MyEntries = () => {
             <h1 className="text-xl sm:text-2xl font-bold text-gray-800">My Entries</h1>
             <p className="text-gray-500 text-xs sm:text-sm mt-1">View and manage your sales entries</p>
           </div>
-          <a
-            href="/sales/new-entry"
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all flex items-center justify-center w-full sm:w-auto"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            New Entry
-          </a>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => {
+                setDownloadFilter('Total');
+                setShowDownloadModal(true);
+              }}
+              disabled={!myEntries.length}
+              title="Download your sales entries as Excel"
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all flex items-center justify-center w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+              </svg>
+              Download Excel Sheet
+            </button>
+            <a
+              href="/sales/new-entry"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all flex items-center justify-center w-full sm:w-auto"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              New Entry
+            </a>
+          </div>
         </div>
 
         {/* Success Message */}
@@ -334,6 +454,87 @@ const MyEntries = () => {
               >
                 Last
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Download Excel Modal */}
+        {showDownloadModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={() => setShowDownloadModal(false)}
+          >
+            <div
+              className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 sm:p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">Download Excel Sheet</h3>
+                <button
+                  onClick={() => setShowDownloadModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="Close"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">Select which leads you want to export.</p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5">
+                {[
+                  { key: 'Total', color: 'blue' },
+                  { key: 'Hot', color: 'red' },
+                  { key: 'Warm', color: 'amber' },
+                  { key: 'Cold', color: 'indigo' },
+                  { key: 'Closed', color: 'green' },
+                  { key: 'Active', color: 'teal' },
+                ].map((opt) => {
+                  const selected = downloadFilter === opt.key;
+                  const selectedClasses = {
+                    blue: 'bg-blue-600 text-white border-blue-600',
+                    red: 'bg-red-600 text-white border-red-600',
+                    amber: 'bg-amber-500 text-white border-amber-500',
+                    indigo: 'bg-indigo-600 text-white border-indigo-600',
+                    green: 'bg-green-600 text-white border-green-600',
+                    teal: 'bg-teal-600 text-white border-teal-600',
+                  }[opt.color];
+                  return (
+                    <button
+                      key={opt.key}
+                      onClick={() => setDownloadFilter(opt.key)}
+                      className={`px-3 py-3 rounded-lg border text-center transition-all ${
+                        selected
+                          ? `${selectedClasses} shadow`
+                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <p className="text-lg font-bold leading-none">{downloadCounts[opt.key]}</p>
+                      <p className="text-xs font-medium mt-1">{opt.key}</p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                <button
+                  onClick={() => setShowDownloadModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDownloadExcel}
+                  disabled={!downloadCounts[downloadFilter]}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                  </svg>
+                  Download ({downloadCounts[downloadFilter]})
+                </button>
+              </div>
             </div>
           </div>
         )}
