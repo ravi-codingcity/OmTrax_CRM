@@ -275,6 +275,17 @@ export const SalesProvider = ({ children }) => {
     }
   }, []);
 
+  // Reassign all leads from one salesperson to another (Admin only)
+  const reassignLeads = useCallback(async (fromSalesPerson, toSalesPerson) => {
+    try {
+      const response = await salesAPI.reassignLeads({ fromSalesPerson, toSalesPerson });
+      return { success: true, data: response.data.data, message: response.data.message };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to reassign leads";
+      return { success: false, message };
+    }
+  }, []);
+
   // Get all entries (returns current state)
   const getAllSalesEntries = useCallback(() => {
     return salesEntries;
@@ -301,6 +312,7 @@ export const SalesProvider = ({ children }) => {
         getStats,
         getAnalytics,
         getAllSalesEntries,
+        reassignLeads,
       }}
     >
       {children}

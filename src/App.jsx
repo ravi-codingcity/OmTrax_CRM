@@ -11,6 +11,7 @@ import Dashboard from './pages/admin/Dashboard';
 import AllSales from './pages/admin/AllSales';
 import Analytics from './pages/admin/Analytics';
 import AdminNewEntry from './pages/admin/AdminNewEntry';
+import AssignLeads from './pages/admin/AssignLeads';
 import NewEntry from './pages/sales/NewEntry';
 import MyEntries from './pages/sales/MyEntries';
 import SalesAnalytics from './pages/sales/SalesAnalytics';
@@ -59,6 +60,14 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole="admin">
                     <AdminNewEntry />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/assign-leads"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AssignLeads />
                   </ProtectedRoute>
                 }
               />

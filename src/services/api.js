@@ -63,6 +63,7 @@ export const salesAPI = {
   delete: (id) => api.delete(`/sales/${id}`),
   getTodayFollowUps: () => api.get('/sales/follow-ups/today'),
   getOverdueFollowUps: () => api.get('/sales/follow-ups/overdue'),
+  reassignLeads: (data) => api.post('/sales/reassign-leads', data),
 };
 
 // ==================== FOLLOW-UP APIs ====================
