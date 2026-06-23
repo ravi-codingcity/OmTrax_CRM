@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authAPI } from '../services/api';
+import { DEPARTMENTS, ROLES_BY_DEPARTMENT, DEFAULT_DEPARTMENT } from '../config/departments';
 import omtrax_logo from '../assets/OmTrax.png';
 
 const Signup = () => {
@@ -11,7 +12,8 @@ const Signup = () => {
     confirmPassword: '',
     name: '',
     email: '',
-    role: 'salesperson',
+    department: DEFAULT_DEPARTMENT,
+    role: ROLES_BY_DEPARTMENT[DEFAULT_DEPARTMENT][0].value,
     branch: '',
     phoneNumber: '',
   });
@@ -26,12 +28,24 @@ const Signup = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const next = { ...prev, [name]: value };
+      // When department changes, reset role to a valid one for that department
+      if (name === 'department') {
+        const roles = ROLES_BY_DEPARTMENT[value] || [];
+        if (!roles.some(r => r.value === prev.role)) {
+          next.role = roles[0]?.value || '';
+        }
+      }
+      return next;
+    });
     // Clear error when user types
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
+
+  const roleOptions = ROLES_BY_DEPARTMENT[formData.department] || [];
 
   const validate = () => {
     const newErrors = {};
@@ -205,18 +219,34 @@ const Signup = () => {
               </div>
             </div>
 
-            {/* Role */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
-              <select
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                className={inputClasses('role')}
-              >
-                <option value="salesperson">Salesperson</option>
-                <option value="admin">Admin</option>
-              </select>
+            {/* Department & Role Row */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Department *</label>
+                <select
+                  name="department"
+                  value={formData.department}
+                  onChange={handleChange}
+                  className={inputClasses('department')}
+                >
+                  {DEPARTMENTS.map(dept => (
+                    <option key={dept.key} value={dept.key}>{dept.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Role *</label>
+                <select
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  className={inputClasses('role')}
+                >
+                  {roleOptions.map(r => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Password & Confirm Password Row */}

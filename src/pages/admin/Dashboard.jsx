@@ -6,6 +6,7 @@ import StatCard from '../../components/Common/StatCard';
 import SalesTable from '../../components/Common/SalesTable';
 import FollowUpModal from '../../components/Common/FollowUpModal';
 import PullToRefresh from '../../components/Common/PullToRefresh';
+import CollapsibleSection from '../../components/Common/CollapsibleSection';
 
 const Dashboard = () => {
   const { salesEntries, stats, loading, fetchSalesEntries, getStats, addFollowUp, updateSalesEntry } = useSales();
@@ -252,13 +253,7 @@ const Dashboard = () => {
         {/* Branch & Requirement Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Branch Wise */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-              Branch Performance
-            </h3>
+          <CollapsibleSection title="Branch Performance">
             <div className="space-y-3">
               {stats?.byBranch && Object.keys(stats.byBranch).length > 0 ? (
                 Object.entries(stats.byBranch).map(([branch, count]) => (
@@ -279,16 +274,10 @@ const Dashboard = () => {
                 <p className="text-sm text-gray-500 text-center py-4">No branch data available</p>
               )}
             </div>
-          </div>
+          </CollapsibleSection>
 
           {/* Requirement Wise */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-              </svg>
-              By Service Type
-            </h3>
+          <CollapsibleSection title="By Service Type">
             <div className="space-y-3">
               {stats?.byRequirement && Object.keys(stats.byRequirement).length > 0 ? (
                 Object.entries(stats.byRequirement).map(([req, count]) => {
@@ -316,16 +305,10 @@ const Dashboard = () => {
                 <p className="text-sm text-gray-500 text-center py-4">No service type data available</p>
               )}
             </div>
-          </div>
+          </CollapsibleSection>
 
           {/* Sales Person Wise */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              Top Performers
-            </h3>
+          <CollapsibleSection title="Top Performers">
             <div className="space-y-3">
               {stats?.bySalesPerson && Object.keys(stats.bySalesPerson).length > 0 ? (
                 Object.entries(stats.bySalesPerson)
@@ -348,7 +331,7 @@ const Dashboard = () => {
                 <p className="text-sm text-gray-500 text-center py-4">No performer data available</p>
               )}
             </div>
-          </div>
+          </CollapsibleSection>
         </div>
 
         {/* Recent Entries */}

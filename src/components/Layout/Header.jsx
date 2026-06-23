@@ -1,11 +1,14 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
+import { useDepartment } from '../../context/DepartmentContext';
+import { getDepartmentLabel } from '../../config/departments';
 import { useNavigate, NavLink } from 'react-router-dom';
 import omtrax_logo from '../../assets/OmTrax.png';
 
 const Header = () => {
   const { user, logout, isAdmin } = useAuth();
+  const { activeDepartment } = useDepartment();
   const { 
     notifications, 
     reminders,
@@ -212,6 +215,28 @@ const Header = () => {
       );
     }
 
+    // Business entry notifications (new or updated)
+    if (notification.type === 'business_new' || notification.type === 'business_update') {
+      const isUpdate = notification.type === 'business_update';
+      return (
+        <>
+          <p className="text-sm text-gray-800">
+            <span className="font-semibold text-purple-600">
+              {isUpdate ? '✏️ Business Updated' : '💼 New Business'}
+            </span>
+            <span className="text-gray-600"> by </span>
+            <span className="font-medium">{getSalesPersonName()}</span>
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Client: {notification.companyName}
+          </p>
+          {notification.remark && (
+            <p className="text-xs text-gray-500 mt-0.5">{notification.remark}</p>
+          )}
+        </>
+      );
+    }
+
     // New sales entry notification (Admin only)
     if (notification.type === 'new_entry' || notification.type === 'sales_entry') {
       return (
@@ -251,6 +276,7 @@ const Header = () => {
     { to: '/admin/new-entry', label: 'New Entry', icon: 'M12 4v16m8-8H4' },
     { to: '/admin/sales', label: 'All Sales', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
     { to: '/sales-visit', label: 'Sales Visit', icon: 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z' },
+    { to: '/admin/business', label: 'Business', icon: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
     { to: '/admin/assign-leads', label: 'Assign Leads', icon: 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4' },
     { to: '/admin/analytics', label: 'Analytics', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
   ];
@@ -258,61 +284,81 @@ const Header = () => {
   const salesLinks = [
     { to: '/sales/new-entry', label: 'New Entry', icon: 'M12 4v16m8-8H4' },
     { to: '/sales/my-entries', label: 'My Entries', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+    { to: '/sales/business', label: 'Business', icon: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
     { to: '/sales-visit', label: 'Sales Visit', icon: 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z' },
     { to: '/sales/analytics', label: 'Analytics', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
   ];
 
-  const links = isAdmin() ? adminLinks : salesLinks;
+  // HR Management does not use these Relocation-specific modules
+  const hrHiddenLabels = ['Sales Visit', 'Assign Leads', 'Business'];
+  const links = (isAdmin() ? adminLinks : salesLinks).filter(
+    (link) => activeDepartment !== 'hr' || !hrHiddenLabels.includes(link.label)
+  );
+  // Secondary/occasional items are kept off the compact mobile bottom bar
+  const mobileHiddenLabels = ['Analytics', 'Assign Leads'];
 
   return (
     <>
     <header className="bg-gradient-to-r from-blue-100 via-white to-blue-200 border-b border-gray-300/80 sticky top-0 z-50 shadow-sm">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6">
-        <div className="flex items-center justify-between h-14">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4">
+        <div className="flex items-center justify-between h-14 gap-2">
 
           {/* Logo & Brand */}
-          <div className="flex items-center space-x-3">
-            <div>
-                <img src={omtrax_logo} alt="OmTrax Logo" className="h-8 sm:h-9 w-auto" />
-            </div>
+          <div className="flex items-center flex-shrink-0">
+            <img src={omtrax_logo} alt="OmTrax Logo" className="h-7 sm:h-8 w-auto" />
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-1 bg-white/60 backdrop-blur-sm px-1.5 py-1 rounded-xl border border-gray-100">
+          <nav className="hidden md:flex items-center gap-0.5 bg-white/60 backdrop-blur-sm px-1 py-1 rounded-xl border border-gray-100">
             {links.map((link) => (
               <NavLink
                 key={link.to}
                 to={link.to}
+                title={link.label}
                 className={({ isActive }) =>
-                  `flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  `flex items-center gap-1.5 px-2 lg:px-2.5 py-1.5 rounded-lg text-[13px] font-medium whitespace-nowrap transition-all duration-200 ${
                     isActive
                       ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md shadow-blue-200'
                       : 'text-gray-600 hover:bg-blue-50 hover:text-blue-700'
                   }`
                 }
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d={link.icon} />
                 </svg>
-                <span>{link.label}</span>
+                <span className="hidden lg:inline">{link.label}</span>
               </NavLink>
             ))}
           </nav>
 
           {/* User Info & Logout */}
-          <div className="flex items-center space-x-1 sm:space-x-2">
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Department switcher - Admin only */}
+            {isAdmin() && (
+              <button
+                onClick={() => navigate('/select-department')}
+                title={`Department: ${getDepartmentLabel(activeDepartment)} — click to switch`}
+                className="flex items-center gap-1.5 px-2 py-1.5 bg-white/70 hover:bg-white border border-gray-200 rounded-lg transition-all"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                <span className="hidden lg:inline text-xs font-medium text-gray-700 max-w-[90px] truncate">{getDepartmentLabel(activeDepartment)}</span>
+              </button>
+            )}
+
             {/* Notification Bell - Available for all users */}
             <div className="relative" ref={notificationRef}>
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                className="relative p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
                 title="Notifications"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 {totalBadgeCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-semibold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-semibold rounded-full h-4 w-4 flex items-center justify-center animate-pulse">
                     {totalBadgeCount > 9 ? '9+' : totalBadgeCount}
                   </span>
                 )}
@@ -394,22 +440,22 @@ const Header = () => {
               )}
             </div>
 
-            <div className="hidden sm:flex items-center space-x-2 px-3 py-1.5 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-100">
-              <div className="w-7 h-7 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
+            <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-100">
+              <div className="w-7 h-7 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center shadow-sm flex-shrink-0">
                 <span className="text-white font-semibold text-xs">
                   {user?.name?.charAt(0).toUpperCase()}
                 </span>
               </div>
-              <div className="text-left">
-                <p className="text-sm font-medium text-gray-800 leading-tight">{user?.name}</p>
-                <p className="text-xs text-gray-500 leading-tight">
+              <div className="text-left hidden lg:block max-w-[120px]">
+                <p className="text-[13px] font-medium text-gray-800 leading-tight truncate">{user?.name}</p>
+                <p className="text-[11px] text-gray-500 leading-tight truncate">
                   {isAdmin() ? 'Admin' : user?.branch}
                 </p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="hidden md:block p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200"
+              className="hidden md:block p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200"
               title="Logout"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -424,7 +470,7 @@ const Header = () => {
     {/* Mobile Bottom Navigation Bar */}
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] rounded-t-2xl">
       <div className="flex items-center justify-around px-2 py-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        {links.filter(link => link.label !== 'Analytics').map((link) => (
+        {links.filter(link => !mobileHiddenLabels.includes(link.label)).map((link) => (
           <NavLink
             key={link.to}
             to={link.to}

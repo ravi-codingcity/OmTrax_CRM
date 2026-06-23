@@ -275,10 +275,18 @@ export const SalesProvider = ({ children }) => {
     }
   }, []);
 
-  // Reassign all leads from one salesperson to another (Admin only)
-  const reassignLeads = useCallback(async (fromSalesPerson, toSalesPerson) => {
+  // Reassign specific leads (by id) to another salesperson (Admin only)
+  const reassignLeads = useCallback(async ({ leadIds, toSalesPerson }) => {
     try {
-      const response = await salesAPI.reassignLeads({ fromSalesPerson, toSalesPerson });
+      const response = await salesAPI.reassignLeads({ leadIds, toSalesPerson });
+      // Reflect the ownership change locally
+      setSalesEntries((prev) =>
+        prev.map((entry) =>
+          leadIds?.includes(entry._id)
+            ? { ...entry, salesPerson: toSalesPerson }
+            : entry
+        )
+      );
       return { success: true, data: response.data.data, message: response.data.message };
     } catch (err) {
       const message = err.response?.data?.message || "Failed to reassign leads";

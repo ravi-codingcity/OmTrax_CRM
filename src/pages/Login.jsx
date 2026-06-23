@@ -16,7 +16,7 @@ const Login = () => {
   useEffect(() => {
     if (user && !loading) {
       if (user.role === 'admin') {
-        navigate('/admin/dashboard', { replace: true });
+        navigate('/select-department', { replace: true });
       } else {
         navigate('/sales/new-entry', { replace: true });
       }
@@ -33,7 +33,7 @@ const Login = () => {
       
       if (result.success) {
         if (result.user.role === 'admin') {
-          navigate('/admin/dashboard', { replace: true });
+          navigate('/select-department', { replace: true });
         } else {
           navigate('/sales/new-entry', { replace: true });
         }

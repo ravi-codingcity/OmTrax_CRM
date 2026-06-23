@@ -1,12 +1,15 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { DepartmentProvider } from './context/DepartmentContext';
 import { SalesProvider } from './context/SalesContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { SalesVisitProvider } from './context/SalesVisitContext';
+import { BusinessProvider } from './context/BusinessContext';
 import ProtectedRoute from './components/Common/ProtectedRoute';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ResetPassword from './pages/ResetPassword';
+import SelectDepartment from './pages/SelectDepartment';
 import Dashboard from './pages/admin/Dashboard';
 import AllSales from './pages/admin/AllSales';
 import Analytics from './pages/admin/Analytics';
@@ -16,19 +19,33 @@ import NewEntry from './pages/sales/NewEntry';
 import MyEntries from './pages/sales/MyEntries';
 import SalesAnalytics from './pages/sales/SalesAnalytics';
 import SalesVisit from './pages/SalesVisit';
+import BusinessOverview from './pages/admin/BusinessOverview';
+import MyBusiness from './pages/sales/MyBusiness';
 
 function App() {
   return (
     <AuthProvider>
+      <DepartmentProvider>
       <NotificationProvider>
         <SalesProvider>
           <SalesVisitProvider>
+          <BusinessProvider>
           <Router>
             <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
               <Route path="/108/signup" element={<Signup />} />
               <Route path="/108/reset-password" element={<ResetPassword />} />
+
+              {/* Department selection (admin) */}
+              <Route
+                path="/select-department"
+                element={
+                  <ProtectedRoute requiredRole="admin" allowWithoutDepartment>
+                    <SelectDepartment />
+                  </ProtectedRoute>
+                }
+              />
               
               {/* Admin Routes */}
               <Route
@@ -71,6 +88,14 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/admin/business"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <BusinessOverview />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Sales Routes */}
               <Route
@@ -97,6 +122,14 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/sales/business"
+                element={
+                  <ProtectedRoute requiredRole="salesperson">
+                    <MyBusiness />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Sales Visit - Accessible by both Admin and Salesperson */}
               <Route
@@ -115,9 +148,11 @@ function App() {
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           </Router>
+          </BusinessProvider>
           </SalesVisitProvider>
         </SalesProvider>
       </NotificationProvider>
+      </DepartmentProvider>
     </AuthProvider>
   );
 }

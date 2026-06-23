@@ -60,6 +60,7 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     localStorage.removeItem('omtrax_token');
     localStorage.removeItem('omtrax_user');
+    localStorage.removeItem('omtrax_department');
   };
 
   const isAdmin = () => user?.role === 'admin';

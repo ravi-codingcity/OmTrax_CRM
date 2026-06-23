@@ -10,12 +10,18 @@ const api = axios.create({
   },
 });
 
-// Request interceptor to add auth token
+// Request interceptor to add auth token + active department
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('omtrax_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    // Attach the active department so the backend can scope data. The backend
+    // only honours this for admins; other roles are locked to their own dept.
+    const department = localStorage.getItem('omtrax_department');
+    if (department) {
+      config.params = { ...(config.params || {}), department };
     }
     return config;
   },
@@ -36,6 +42,7 @@ api.interceptors.response.use(
       if (!isLoginRequest && !isOnLoginPage) {
         localStorage.removeItem('omtrax_token');
         localStorage.removeItem('omtrax_user');
+        localStorage.removeItem('omtrax_department');
         window.location.href = '/login';
       }
     }
@@ -64,6 +71,15 @@ export const salesAPI = {
   getTodayFollowUps: () => api.get('/sales/follow-ups/today'),
   getOverdueFollowUps: () => api.get('/sales/follow-ups/overdue'),
   reassignLeads: (data) => api.post('/sales/reassign-leads', data),
+};
+
+// ==================== BUSINESS APIs ====================
+export const businessAPI = {
+  getAll: (params = {}) => api.get('/business', { params }),
+  getById: (id) => api.get(`/business/${id}`),
+  create: (data) => api.post('/business', data),
+  update: (id, data) => api.put(`/business/${id}`, data),
+  delete: (id) => api.delete(`/business/${id}`),
 };
 
 // ==================== FOLLOW-UP APIs ====================

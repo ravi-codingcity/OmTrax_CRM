@@ -1,8 +1,10 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useDepartment } from '../../context/DepartmentContext';
 
-const ProtectedRoute = ({ children, requiredRole }) => {
+const ProtectedRoute = ({ children, requiredRole, allowWithoutDepartment = false }) => {
   const { user, isAdmin, loading } = useAuth();
+  const { hasSelectedDepartment } = useDepartment();
 
   // Show loading state while checking authentication
   if (loading) {
@@ -29,6 +31,11 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 
   if (requiredRole === 'salesperson' && isAdmin()) {
     return <Navigate to="/admin/dashboard" replace />;
+  }
+
+  // Admins must pick a department before entering any CRM screen.
+  if (isAdmin() && !allowWithoutDepartment && !hasSelectedDepartment) {
+    return <Navigate to="/select-department" replace />;
   }
 
   return children;

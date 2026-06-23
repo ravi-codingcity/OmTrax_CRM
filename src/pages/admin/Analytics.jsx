@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSales } from '../../context/SalesContext';
+import { useBusiness } from '../../context/BusinessContext';
 import MainLayout from '../../components/Layout/MainLayout';
+import BusinessAnalytics from '../../components/Business/BusinessAnalytics';
+import CollapsibleSection from '../../components/Common/CollapsibleSection';
 
 const Analytics = () => {
   const { salesEntries, stats, loading, fetchSalesEntries, getStats, getAnalytics } = useSales();
+  const { businessEntries, fetchBusinessEntries } = useBusiness();
   const [entries, setEntries] = useState([]);
   const [analyticsData, setAnalyticsData] = useState(null);
 
@@ -11,9 +15,10 @@ const Analytics = () => {
   const loadData = useCallback(async () => {
     await fetchSalesEntries();
     await getStats();
+    await fetchBusinessEntries();
     const analytics = await getAnalytics();
     setAnalyticsData(analytics);
-  }, [fetchSalesEntries, getStats, getAnalytics]);
+  }, [fetchSalesEntries, getStats, getAnalytics, fetchBusinessEntries]);
 
   useEffect(() => {
     loadData();
@@ -125,8 +130,7 @@ const Analytics = () => {
         {/* Charts Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {/* Status Distribution */}
-          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-5">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">Lead Status Distribution</h3>
+          <CollapsibleSection title="Lead Status Distribution">
             <div className="space-y-4">
               {[
                 { label: 'Hot', value: stats?.hot || 0, color: 'bg-red-500' },
@@ -150,11 +154,10 @@ const Analytics = () => {
                 </div>
               ))}
             </div>
-          </div>
+          </CollapsibleSection>
 
           {/* Service Type Distribution */}
-          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-5">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">Service Type Distribution</h3>
+          <CollapsibleSection title="Service Type Distribution">
             <div className="space-y-4">
               {stats?.byRequirement && Object.keys(stats.byRequirement).length > 0 ? (
                 Object.entries(stats.byRequirement).map(([req, count]) => {
@@ -184,11 +187,10 @@ const Analytics = () => {
                 <p className="text-xs sm:text-sm text-gray-500 text-center py-4">No service type data available</p>
               )}
             </div>
-          </div>
+          </CollapsibleSection>
 
           {/* Branch Performance */}
-          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-5">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">Branch Performance</h3>
+          <CollapsibleSection title="Branch Performance">
             <div className="grid grid-cols-2 gap-2 sm:gap-4">
               {stats?.byBranch && Object.keys(stats.byBranch).length > 0 ? (
                 Object.entries(stats.byBranch).map(([branch, count]) => (
@@ -206,11 +208,10 @@ const Analytics = () => {
                 </div>
               )}
             </div>
-          </div>
+          </CollapsibleSection>
 
           {/* Sales Person Leaderboard */}
-          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-5">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">Sales Leaderboard</h3>
+          <CollapsibleSection title="Sales Leaderboard">
             <div className="space-y-3">
               {stats?.bySalesPerson && Object.keys(stats.bySalesPerson).length > 0 ? (
                 Object.entries(stats.bySalesPerson)
@@ -243,12 +244,11 @@ const Analytics = () => {
                 <p className="text-xs sm:text-sm text-gray-500 text-center py-4">No sales data available</p>
               )}
             </div>
-          </div>
+          </CollapsibleSection>
         </div>
 
         {/* Recent Activity */}
-        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-5">
-          <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">Recent Activity Timeline</h3>
+        <CollapsibleSection title="Recent Activity Timeline">
           <div className="space-y-3 sm:space-y-4">
             {Object.entries(entriesByDate)
               .sort((a, b) => new Date(b[0]) - new Date(a[0]))
@@ -265,6 +265,22 @@ const Analytics = () => {
                 </div>
               ))}
           </div>
+        </CollapsibleSection>
+
+        {/* Business Analytics */}
+        <div className="pt-2">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="bg-blue-100 p-2 rounded-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-800">Business Analytics</h2>
+              <p className="text-gray-500 text-xs sm:text-sm">Revenue performance across salespersons and clients</p>
+            </div>
+          </div>
+          <BusinessAnalytics entries={businessEntries} isAdmin={true} />
         </div>
       </div>
     </MainLayout>

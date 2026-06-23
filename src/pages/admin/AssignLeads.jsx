@@ -4,12 +4,29 @@ import { useSales } from '../../context/SalesContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import PullToRefresh from '../../components/Common/PullToRefresh';
 
+const ownerId = (entry) => entry.salesPerson?._id || entry.salesPerson || '';
+const ownerName = (entry) => entry.salesPersonName || entry.salesPerson?.name || 'Unknown';
+
+const statusBadge = (status) => {
+  const s = (status || '').toLowerCase();
+  const map = {
+    hot: 'bg-red-100 text-red-700',
+    warm: 'bg-amber-100 text-amber-700',
+    cold: 'bg-blue-100 text-blue-700',
+    closed: 'bg-green-100 text-green-700',
+    active: 'bg-teal-100 text-teal-700',
+  };
+  return map[s] || 'bg-gray-100 text-gray-600';
+};
+
 const AssignLeads = () => {
   const { getUsers } = useAuth();
   const { salesEntries, loading, fetchSalesEntries, reassignLeads } = useSales();
 
   const [users, setUsers] = useState([]);
-  const [fromUserId, setFromUserId] = useState('');
+  const [sourceFilter, setSourceFilter] = useState(''); // narrow list by current owner
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedIds, setSelectedIds] = useState([]);
   const [toUserId, setToUserId] = useState('');
 
   const [showConfirm, setShowConfirm] = useState(false);
@@ -17,46 +34,74 @@ const AssignLeads = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Load users + sales entries
+  // Load assignable users + sales entries
   const loadData = useCallback(async () => {
     const [userList] = await Promise.all([getUsers(), fetchSalesEntries()]);
-    // Only salespersons can own/receive leads
-    setUsers((userList || []).filter((u) => u.role === 'salesperson'));
+    // Anyone who isn't an admin can own/receive leads (salesperson, manager, etc.)
+    setUsers((userList || []).filter((u) => u.role !== 'admin'));
   }, [getUsers, fetchSalesEntries]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Count active leads owned by each salesperson (from loaded entries)
+  const toUser = users.find((u) => u._id === toUserId);
+
+  // Leads owned by each user (for the source dropdown counts)
   const leadCountByUser = useMemo(() => {
     const counts = {};
-    salesEntries.forEach((entry) => {
-      const ownerId = entry.salesPerson?._id || entry.salesPerson;
-      if (ownerId) {
-        counts[ownerId] = (counts[ownerId] || 0) + 1;
-      }
+    salesEntries.forEach((e) => {
+      const id = ownerId(e);
+      if (id) counts[id] = (counts[id] || 0) + 1;
     });
     return counts;
   }, [salesEntries]);
 
-  const fromUser = users.find((u) => u._id === fromUserId);
-  const toUser = users.find((u) => u._id === toUserId);
-  const fromLeadCount = fromUserId ? leadCountByUser[fromUserId] || 0 : 0;
+  // Leads visible in the picker (filtered by owner + search)
+  const visibleLeads = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return salesEntries.filter((e) => {
+      const matchesOwner = !sourceFilter || String(ownerId(e)) === sourceFilter;
+      const matchesSearch =
+        !term ||
+        e.companyName?.toLowerCase().includes(term) ||
+        e.contactPerson?.toLowerCase().includes(term) ||
+        e.location?.toLowerCase().includes(term);
+      return matchesOwner && matchesSearch;
+    });
+  }, [salesEntries, sourceFilter, searchTerm]);
 
-  const canSubmit =
-    fromUserId && toUserId && fromUserId !== toUserId && !isSubmitting;
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const visibleSelectedCount = visibleLeads.filter((e) => selectedSet.has(e._id)).length;
+  const allVisibleSelected = visibleLeads.length > 0 && visibleSelectedCount === visibleLeads.length;
 
-  const handleOpenConfirm = (e) => {
-    e.preventDefault();
+  const toggleLead = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    const visibleIds = visibleLeads.map((e) => e._id);
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+    } else {
+      setSelectedIds((prev) => [...new Set([...prev, ...visibleIds])]);
+    }
+  };
+
+  const clearSelection = () => setSelectedIds([]);
+
+  const canSubmit = selectedIds.length > 0 && toUserId && !isSubmitting;
+
+  const handleOpenConfirm = () => {
     setErrorMessage('');
-
-    if (!fromUserId || !toUserId) {
-      setErrorMessage('Please select both the current and the new salesperson.');
+    if (selectedIds.length === 0) {
+      setErrorMessage('Select at least one lead to transfer.');
       return;
     }
-    if (fromUserId === toUserId) {
-      setErrorMessage('Current and new salesperson must be different.');
+    if (!toUserId) {
+      setErrorMessage('Select the salesperson to assign the leads to.');
       return;
     }
     setShowConfirm(true);
@@ -66,7 +111,7 @@ const AssignLeads = () => {
     setIsSubmitting(true);
     setErrorMessage('');
 
-    const result = await reassignLeads(fromUserId, toUserId);
+    const result = await reassignLeads({ leadIds: selectedIds, toSalesPerson: toUserId });
 
     setIsSubmitting(false);
     setShowConfirm(false);
@@ -75,12 +120,10 @@ const AssignLeads = () => {
       const count = result.data?.transferredCount ?? 0;
       setSuccessMessage(
         count > 0
-          ? `Transferred ${count} lead(s) from ${fromUser?.name} to ${toUser?.name}.`
-          : `${fromUser?.name} had no leads to transfer.`
+          ? `Transferred ${count} lead(s) to ${toUser?.name}.`
+          : 'No leads needed transferring (already owned by the selected salesperson).'
       );
-      setFromUserId('');
-      setToUserId('');
-      // Refresh entries so updated ownership/counts reflect immediately
+      setSelectedIds([]);
       await fetchSalesEntries();
       setTimeout(() => setSuccessMessage(''), 5000);
     } else {
@@ -94,12 +137,12 @@ const AssignLeads = () => {
   return (
     <MainLayout>
       <PullToRefresh onRefresh={loadData} disabled={loading}>
-        <div className="max-w-3xl mx-auto space-y-4 sm:space-y-6">
+        <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
           {/* Page Header */}
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Assign Leads</h1>
             <p className="text-gray-500 text-xs sm:text-sm mt-1">
-              Transfer all sales entries, follow-ups and reminders from one salesperson to another.
+              Select specific leads and transfer them to another salesperson.
             </p>
           </div>
 
@@ -123,48 +166,30 @@ const AssignLeads = () => {
             </div>
           )}
 
-          {/* Form Card */}
-          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-            <form onSubmit={handleOpenConfirm} className="space-y-5">
-              {/* From Salesperson */}
+          {/* Controls */}
+          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-5 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Filter by current owner */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Transfer leads from <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Filter by current owner</label>
                 <select
-                  value={fromUserId}
-                  onChange={(e) => setFromUserId(e.target.value)}
+                  value={sourceFilter}
+                  onChange={(e) => setSourceFilter(e.target.value)}
                   className={selectClasses}
                 >
-                  <option value="">Select current salesperson</option>
+                  <option value="">All salespersons</option>
                   {users.map((u) => (
                     <option key={u._id} value={u._id}>
-                      {u.name}
-                      {u.branch ? ` — ${u.branch}` : ''} ({leadCountByUser[u._id] || 0} leads)
-                      {u.isActive === false ? ' • inactive' : ''}
+                      {u.name}{u.branch ? ` — ${u.branch}` : ''} ({leadCountByUser[u._id] || 0})
                     </option>
                   ))}
                 </select>
-                {fromUserId && (
-                  <p className="text-xs text-gray-500 mt-1.5">
-                    <span className="font-semibold text-gray-700">{fromLeadCount}</span> lead(s) will be transferred.
-                  </p>
-                )}
               </div>
 
-              {/* Arrow */}
-              <div className="flex justify-center">
-                <div className="p-2 bg-blue-50 rounded-full">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                  </svg>
-                </div>
-              </div>
-
-              {/* To Salesperson */}
+              {/* Assign to */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Assign leads to <span className="text-red-500">*</span>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Assign selected leads to <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={toUserId}
@@ -173,42 +198,112 @@ const AssignLeads = () => {
                 >
                   <option value="">Select new salesperson</option>
                   {users
-                    .filter((u) => u._id !== fromUserId && u.isActive !== false)
+                    .filter((u) => u.isActive !== false)
                     .map((u) => (
                       <option key={u._id} value={u._id}>
-                        {u.name}
-                        {u.branch ? ` — ${u.branch}` : ''} ({leadCountByUser[u._id] || 0} leads)
+                        {u.name}{u.branch ? ` — ${u.branch}` : ''}
                       </option>
                     ))}
                 </select>
               </div>
+            </div>
 
-              {/* Info note */}
-              <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5 text-xs text-blue-800 flex items-start gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>
-                  All sales entries, follow-up history and pending reminders move to the new
-                  salesperson and appear instantly in their dashboard, My Entries, analytics and
-                  notifications. The complete lead history is preserved.
+            {/* Search */}
+            <div className="relative">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search company, contact, location..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            {/* Leads list */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              {/* List header */}
+              <div className="flex items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleSelectAllVisible}
+                    disabled={visibleLeads.length === 0}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-xs font-medium text-gray-600">
+                    Select all ({visibleLeads.length})
+                  </span>
+                </label>
+                <span className="text-xs text-gray-400 ml-auto">
+                  {selectedIds.length} selected
                 </span>
               </div>
 
-              {/* Submit */}
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={!canSubmit}
-                  className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                  </svg>
-                  Transfer Leads
-                </button>
+              {/* List body */}
+              <div className="max-h-[22rem] overflow-y-auto divide-y divide-gray-100">
+                {visibleLeads.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-8">No leads match the current filters.</p>
+                ) : (
+                  visibleLeads.map((entry) => {
+                    const checked = selectedSet.has(entry._id);
+                    return (
+                      <label
+                        key={entry._id}
+                        className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
+                          checked ? 'bg-blue-50' : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleLead(entry._id)}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-800 truncate">{entry.companyName}</p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {entry.contactPerson || '—'}{entry.location ? ` • ${entry.location}` : ''}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className={`hidden sm:inline px-2 py-0.5 rounded text-[11px] font-medium ${statusBadge(entry.queryStatus)}`}>
+                            {entry.queryStatus || '—'}
+                          </span>
+                          <span className="text-[11px] text-gray-500 max-w-[110px] truncate text-right">{ownerName(entry)}</span>
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
               </div>
-            </form>
+            </div>
+
+            {/* Footer actions */}
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2">
+              <button
+                type="button"
+                onClick={clearSelection}
+                disabled={selectedIds.length === 0}
+                className="text-sm text-gray-500 hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed self-start sm:self-auto"
+              >
+                Clear selection
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenConfirm}
+                disabled={!canSubmit}
+                className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                Transfer {selectedIds.length > 0 ? `${selectedIds.length} ` : ''}Lead{selectedIds.length === 1 ? '' : 's'}
+              </button>
+            </div>
           </div>
 
           {/* Confirmation Modal */}
@@ -231,11 +326,10 @@ const AssignLeads = () => {
                 </div>
 
                 <p className="text-sm text-gray-600 mb-4">
-                  You are about to transfer{' '}
-                  <span className="font-semibold text-gray-800">{fromLeadCount} lead(s)</span> from{' '}
-                  <span className="font-semibold text-gray-800">{fromUser?.name}</span> to{' '}
-                  <span className="font-semibold text-gray-800">{toUser?.name}</span>. This will
-                  move all related entries, follow-ups and reminders. Continue?
+                  Transfer{' '}
+                  <span className="font-semibold text-gray-800">{selectedIds.length} selected lead(s)</span> to{' '}
+                  <span className="font-semibold text-gray-800">{toUser?.name}</span>? Their follow-ups and
+                  reminders move along with each lead, and the full history is preserved.
                 </p>
 
                 <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
