@@ -29,11 +29,7 @@ export const ROLES_BY_DEPARTMENT = {
   ],
   hr: [
     { value: 'recruiter', label: 'Recruiter' },
-    { value: 'senior_recruiter', label: 'Senior Recruiter' },
-    { value: 'hr_executive', label: 'HR Executive' },
-    { value: 'hr_manager', label: 'HR Manager' },
-    { value: 'hr_head', label: 'HR Head' },
-    { value: 'admin', label: 'Admin' },
+    { value: 'team_leader', label: 'HR Team Leader' },
   ],
 };
 

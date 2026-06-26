@@ -237,6 +237,23 @@ const Header = () => {
       );
     }
 
+    // HR recruitment notifications
+    if (notification.type === 'hr_assignment' || notification.type === 'hr_update') {
+      const isAssign = notification.type === 'hr_assignment';
+      return (
+        <>
+          <p className="text-sm text-gray-800">
+            <span className={`font-semibold ${isAssign ? 'text-indigo-600' : 'text-teal-600'}`}>
+              {isAssign ? '📋 New Requirement' : '🔄 Progress Update'}
+            </span>
+            <span className="text-gray-600"> {isAssign ? 'assigned by' : 'by'} </span>
+            <span className="font-medium">{getSalesPersonName()}</span>
+          </p>
+          <p className="text-xs text-gray-500 mt-1 truncate">{notification.companyName}</p>
+        </>
+      );
+    }
+
     // New sales entry notification (Admin only)
     if (notification.type === 'new_entry' || notification.type === 'sales_entry') {
       return (
@@ -289,11 +306,17 @@ const Header = () => {
     { to: '/sales/analytics', label: 'Analytics', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
   ];
 
-  // HR Management does not use these Relocation-specific modules
-  const hrHiddenLabels = ['Sales Visit', 'Assign Leads', 'Business'];
-  const links = (isAdmin() ? adminLinks : salesLinks).filter(
-    (link) => activeDepartment !== 'hr' || !hrHiddenLabels.includes(link.label)
-  );
+  // HR Management has its own recruitment-focused navigation
+  const hrLinks = [
+    { to: '/hr/dashboard', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+    { to: '/hr/requirements', label: user?.role === 'recruiter' ? 'My Tasks' : 'Requirements', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+  ];
+  // Analytics is available to HR Admins only
+  if (isAdmin()) {
+    hrLinks.push({ to: '/hr/analytics', label: 'Analytics', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' });
+  }
+
+  const links = activeDepartment === 'hr' ? hrLinks : (isAdmin() ? adminLinks : salesLinks);
   // Secondary/occasional items are kept off the compact mobile bottom bar
   const mobileHiddenLabels = ['Analytics', 'Assign Leads'];
 

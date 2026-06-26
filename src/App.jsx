@@ -5,6 +5,7 @@ import { SalesProvider } from './context/SalesContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { SalesVisitProvider } from './context/SalesVisitContext';
 import { BusinessProvider } from './context/BusinessContext';
+import { RecruitmentProvider } from './context/RecruitmentContext';
 import ProtectedRoute from './components/Common/ProtectedRoute';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -21,6 +22,9 @@ import SalesAnalytics from './pages/sales/SalesAnalytics';
 import SalesVisit from './pages/SalesVisit';
 import BusinessOverview from './pages/admin/BusinessOverview';
 import MyBusiness from './pages/sales/MyBusiness';
+import HrDashboard from './pages/hr/HrDashboard';
+import HrRequirements from './pages/hr/HrRequirements';
+import HrAnalytics from './pages/hr/HrAnalytics';
 
 function App() {
   return (
@@ -30,6 +34,7 @@ function App() {
         <SalesProvider>
           <SalesVisitProvider>
           <BusinessProvider>
+          <RecruitmentProvider>
           <Router>
             <Routes>
               {/* Public Routes */}
@@ -131,6 +136,32 @@ function App() {
                 }
               />
 
+              {/* HR Management Routes - any HR-department user */}
+              <Route
+                path="/hr/dashboard"
+                element={
+                  <ProtectedRoute requiredDepartment="hr">
+                    <HrDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hr/requirements"
+                element={
+                  <ProtectedRoute requiredDepartment="hr">
+                    <HrRequirements />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hr/analytics"
+                element={
+                  <ProtectedRoute requiredRole="admin" requiredDepartment="hr">
+                    <HrAnalytics />
+                  </ProtectedRoute>
+                }
+              />
+
               {/* Sales Visit - Accessible by both Admin and Salesperson */}
               <Route
                 path="/sales-visit"
@@ -148,6 +179,7 @@ function App() {
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           </Router>
+          </RecruitmentProvider>
           </BusinessProvider>
           </SalesVisitProvider>
         </SalesProvider>

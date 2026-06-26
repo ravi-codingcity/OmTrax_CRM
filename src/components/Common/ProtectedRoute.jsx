@@ -2,9 +2,9 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useDepartment } from '../../context/DepartmentContext';
 
-const ProtectedRoute = ({ children, requiredRole, allowWithoutDepartment = false }) => {
+const ProtectedRoute = ({ children, requiredRole, requiredDepartment, allowWithoutDepartment = false }) => {
   const { user, isAdmin, loading } = useAuth();
-  const { hasSelectedDepartment } = useDepartment();
+  const { hasSelectedDepartment, activeDepartment } = useDepartment();
 
   // Show loading state while checking authentication
   if (loading) {
@@ -26,7 +26,7 @@ const ProtectedRoute = ({ children, requiredRole, allowWithoutDepartment = false
   }
 
   if (requiredRole === 'admin' && !isAdmin()) {
-    return <Navigate to="/sales/new-entry" replace />;
+    return <Navigate to={activeDepartment === 'hr' ? '/hr/dashboard' : '/sales/new-entry'} replace />;
   }
 
   if (requiredRole === 'salesperson' && isAdmin()) {
@@ -36,6 +36,12 @@ const ProtectedRoute = ({ children, requiredRole, allowWithoutDepartment = false
   // Admins must pick a department before entering any CRM screen.
   if (isAdmin() && !allowWithoutDepartment && !hasSelectedDepartment) {
     return <Navigate to="/select-department" replace />;
+  }
+
+  // Department-scoped routes: send users to their correct CRM if mismatched.
+  if (requiredDepartment && activeDepartment !== requiredDepartment) {
+    if (isAdmin()) return <Navigate to="/select-department" replace />;
+    return <Navigate to={activeDepartment === 'hr' ? '/hr/dashboard' : '/sales/new-entry'} replace />;
   }
 
   return children;

@@ -82,6 +82,18 @@ export const businessAPI = {
   delete: (id) => api.delete(`/business/${id}`),
 };
 
+// ==================== RECRUITMENT (HR) APIs ====================
+export const recruitmentAPI = {
+  getAll: (params = {}) => api.get('/recruitment', { params }),
+  getStats: () => api.get('/recruitment/stats'),
+  getRecruiters: () => api.get('/recruitment/recruiters'),
+  getById: (id) => api.get(`/recruitment/${id}`),
+  create: (data) => api.post('/recruitment', data),
+  update: (id, data) => api.put(`/recruitment/${id}`, data),
+  reassign: (id, data) => api.put(`/recruitment/${id}/reassign`, data),
+  delete: (id) => api.delete(`/recruitment/${id}`),
+};
+
 // ==================== FOLLOW-UP APIs ====================
 export const followUpAPI = {
   create: (data) => api.post('/follow-ups', data),

@@ -34,7 +34,7 @@ const SelectDepartment = () => {
 
   const handleSelect = (deptKey) => {
     setActiveDepartment(deptKey);
-    navigate('/admin/dashboard', { replace: true });
+    navigate(deptKey === 'hr' ? '/hr/dashboard' : '/admin/dashboard', { replace: true });
   };
 
   const handleLogout = () => {

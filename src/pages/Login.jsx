@@ -17,6 +17,8 @@ const Login = () => {
     if (user && !loading) {
       if (user.role === 'admin') {
         navigate('/select-department', { replace: true });
+      } else if (user.department === 'hr') {
+        navigate('/hr/dashboard', { replace: true });
       } else {
         navigate('/sales/new-entry', { replace: true });
       }
@@ -34,6 +36,8 @@ const Login = () => {
       if (result.success) {
         if (result.user.role === 'admin') {
           navigate('/select-department', { replace: true });
+        } else if (result.user.department === 'hr') {
+          navigate('/hr/dashboard', { replace: true });
         } else {
           navigate('/sales/new-entry', { replace: true });
         }
