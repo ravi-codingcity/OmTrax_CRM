@@ -6,6 +6,10 @@ const ProtectedRoute = ({ children, requiredRole, requiredDepartment, allowWitho
   const { user, isAdmin, loading } = useAuth();
   const { hasSelectedDepartment, activeDepartment } = useDepartment();
 
+  // Home path for a non-admin user based on their department
+  const homePath = () =>
+    ({ hr: '/hr/dashboard', purchase: '/purchase/dashboard' }[activeDepartment] || '/sales/new-entry');
+
   // Show loading state while checking authentication
   if (loading) {
     return (
@@ -26,7 +30,7 @@ const ProtectedRoute = ({ children, requiredRole, requiredDepartment, allowWitho
   }
 
   if (requiredRole === 'admin' && !isAdmin()) {
-    return <Navigate to={activeDepartment === 'hr' ? '/hr/dashboard' : '/sales/new-entry'} replace />;
+    return <Navigate to={homePath()} replace />;
   }
 
   if (requiredRole === 'salesperson' && isAdmin()) {
@@ -41,7 +45,7 @@ const ProtectedRoute = ({ children, requiredRole, requiredDepartment, allowWitho
   // Department-scoped routes: send users to their correct CRM if mismatched.
   if (requiredDepartment && activeDepartment !== requiredDepartment) {
     if (isAdmin()) return <Navigate to="/select-department" replace />;
-    return <Navigate to={activeDepartment === 'hr' ? '/hr/dashboard' : '/sales/new-entry'} replace />;
+    return <Navigate to={homePath()} replace />;
   }
 
   return children;

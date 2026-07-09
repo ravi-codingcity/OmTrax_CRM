@@ -82,6 +82,23 @@ export const businessAPI = {
   delete: (id) => api.delete(`/business/${id}`),
 };
 
+// ==================== PURCHASE APIs ====================
+export const purchaseAPI = {
+  getItems: (params = {}) => api.get('/purchase/items', { params }),
+  createItem: (data) => api.post('/purchase/items', data),
+  getSuppliers: (params = {}) => api.get('/purchase/suppliers', { params }),
+  createSupplier: (data) => api.post('/purchase/suppliers', data),
+  getEntries: (params = {}) => api.get('/purchase/entries', { params }),
+  getEntry: (id) => api.get(`/purchase/entries/${id}`),
+  create: (data) => api.post('/purchase/entries', data),
+  update: (id, data) => api.put(`/purchase/entries/${id}`, data),
+  delete: (id) => api.delete(`/purchase/entries/${id}`),
+  dispatch: (id, data) => api.post(`/purchase/entries/${id}/dispatch`, data),
+  return: (id, data) => api.post(`/purchase/entries/${id}/return`, data),
+  getInventory: () => api.get('/purchase/inventory'),
+  getStats: () => api.get('/purchase/stats'),
+};
+
 // ==================== RECRUITMENT (HR) APIs ====================
 export const recruitmentAPI = {
   getAll: (params = {}) => api.get('/recruitment', { params }),

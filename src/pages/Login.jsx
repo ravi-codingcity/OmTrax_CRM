@@ -19,6 +19,8 @@ const Login = () => {
         navigate('/select-department', { replace: true });
       } else if (user.department === 'hr') {
         navigate('/hr/dashboard', { replace: true });
+      } else if (user.department === 'purchase') {
+        navigate('/purchase/dashboard', { replace: true });
       } else {
         navigate('/sales/new-entry', { replace: true });
       }
@@ -38,6 +40,8 @@ const Login = () => {
           navigate('/select-department', { replace: true });
         } else if (result.user.department === 'hr') {
           navigate('/hr/dashboard', { replace: true });
+        } else if (result.user.department === 'purchase') {
+          navigate('/purchase/dashboard', { replace: true });
         } else {
           navigate('/sales/new-entry', { replace: true });
         }

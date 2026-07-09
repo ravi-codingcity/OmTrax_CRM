@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd d:/OmTrax_CRM && echo \"=== frontend Purchase folder ===\" && find my-project/src -type d -iname \"*purchase*\" && echo \"--- contents ---\" && find my-project/src -ipath \"*purchase*\" -type f 2>/dev/null; echo \"=== backend src tree ===\" && find CRM_backend/src -type f | sort)",
+      "Read(//d/OmTrax_CRM/**)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"require\\('./src/app'\\); console.log\\('backend app OK'\\)\")",
+      "Bash(grep -vE \"^\\\\s*$|^\\\\s*[0-9]+ \\\\|\")",
+      "Bash(node -c src/constants/purchaseConstants.js)",
+      "Bash(node -e \"require\\('./src/models/Supplier'\\);require\\('./src/controllers/supplierController'\\);require\\('./src/controllers/purchaseController'\\);require\\('./src/routes/purchaseRoutes'\\);require\\('./src/app'\\);console.log\\('OK'\\)\")",
+      "Bash(node -e \"require\\('./src/app'\\);console.log\\('backend OK'\\)\")",
+      "Bash(npm install *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('exceljs:', p.dependencies.exceljs || 'MISSING'\\)\")"
+    ],
+    "additionalDirectories": [
+      "d:\\OmTrax_CRM\\CRM_backend\\src\\utils",
+      "d:\\OmTrax_CRM\\CRM_backend\\src\\middleware",
+      "d:\\OmTrax_CRM\\CRM_backend\\src\\constants",
+      "d:\\OmTrax_CRM\\CRM_backend\\src\\models",
+      "d:\\OmTrax_CRM\\CRM_backend\\src\\services",
+      "d:\\OmTrax_CRM\\CRM_backend\\src\\controllers",
+      "d:\\OmTrax_CRM\\CRM_backend\\src\\routes",
+      "d:\\OmTrax_CRM\\CRM_backend\\src"
+    ]
+  }
+}

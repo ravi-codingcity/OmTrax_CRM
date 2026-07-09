@@ -6,6 +6,7 @@ import { NotificationProvider } from './context/NotificationContext';
 import { SalesVisitProvider } from './context/SalesVisitContext';
 import { BusinessProvider } from './context/BusinessContext';
 import { RecruitmentProvider } from './context/RecruitmentContext';
+import { PurchaseProvider } from './context/PurchaseContext';
 import ProtectedRoute from './components/Common/ProtectedRoute';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -25,6 +26,9 @@ import MyBusiness from './pages/sales/MyBusiness';
 import HrDashboard from './pages/hr/HrDashboard';
 import HrRequirements from './pages/hr/HrRequirements';
 import HrAnalytics from './pages/hr/HrAnalytics';
+import PurchaseDashboard from './pages/Purchase/PurchaseDashboard';
+import PurchaseEntries from './pages/Purchase/PurchaseEntries';
+import PurchaseAnalytics from './pages/Purchase/PurchaseAnalytics';
 
 function App() {
   return (
@@ -35,6 +39,7 @@ function App() {
           <SalesVisitProvider>
           <BusinessProvider>
           <RecruitmentProvider>
+          <PurchaseProvider>
           <Router>
             <Routes>
               {/* Public Routes */}
@@ -162,6 +167,32 @@ function App() {
                 }
               />
 
+              {/* Purchase Management Routes - Purchase department users + CRM Admin */}
+              <Route
+                path="/purchase/dashboard"
+                element={
+                  <ProtectedRoute requiredDepartment="purchase">
+                    <PurchaseDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/purchase/entries"
+                element={
+                  <ProtectedRoute requiredDepartment="purchase">
+                    <PurchaseEntries />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/purchase/analytics"
+                element={
+                  <ProtectedRoute requiredDepartment="purchase">
+                    <PurchaseAnalytics />
+                  </ProtectedRoute>
+                }
+              />
+
               {/* Sales Visit - Accessible by both Admin and Salesperson */}
               <Route
                 path="/sales-visit"
@@ -179,6 +210,7 @@ function App() {
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           </Router>
+          </PurchaseProvider>
           </RecruitmentProvider>
           </BusinessProvider>
           </SalesVisitProvider>

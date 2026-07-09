@@ -16,6 +16,11 @@ const colorClasses = {
     icon: 'bg-purple-100 text-purple-600',
     btn: 'bg-purple-600 hover:bg-purple-700',
   },
+  emerald: {
+    ring: 'hover:border-emerald-500 hover:shadow-emerald-100',
+    icon: 'bg-emerald-100 text-emerald-600',
+    btn: 'bg-emerald-600 hover:bg-emerald-700',
+  },
 };
 
 const SelectDepartment = () => {
@@ -34,7 +39,8 @@ const SelectDepartment = () => {
 
   const handleSelect = (deptKey) => {
     setActiveDepartment(deptKey);
-    navigate(deptKey === 'hr' ? '/hr/dashboard' : '/admin/dashboard', { replace: true });
+    const home = { hr: '/hr/dashboard', purchase: '/purchase/dashboard' }[deptKey] || '/admin/dashboard';
+    navigate(home, { replace: true });
   };
 
   const handleLogout = () => {
@@ -53,7 +59,7 @@ const SelectDepartment = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {DEPARTMENTS.map((dept) => {
             const c = colorClasses[dept.color] || colorClasses.blue;
             return (
