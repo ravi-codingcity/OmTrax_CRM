@@ -44,6 +44,14 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
     return 'Unknown';
   };
 
+  // Build the ownership chain for a reassigned lead, e.g. "Amol → Manoj → Anchal".
+  // Previous owners are recorded in previousSalesPersons; the current owner is appended.
+  const getAssignmentChain = (entry) => {
+    const prev = (entry.previousSalesPersons || []).map((p) => p.salesPersonName).filter(Boolean);
+    if (prev.length === 0) return [];
+    return [...prev, getSalesPersonName(entry)];
+  };
+
   // Get follow-up count
   const getFollowUpCount = (entry) => {
     if (entry.followUpHistory?.length) return entry.followUpHistory.length;
@@ -113,8 +121,11 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
         </thead>
         <tbody>
           {entries.map((entry, index) => (
-            <tr key={entry._id || entry.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
-              <td className="px-3 py-2.5 text-xs text-gray-700 border-b border-r border-gray-200 align-middle whitespace-nowrap">{formatDate(entry.createdAt || entry.date)}</td>
+            <tr
+              key={entry._id || entry.id}
+              className={`transition-colors ${entry.newlyAssigned ? 'bg-amber-50 hover:bg-amber-100' : `${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}`}
+            >
+              <td className={`px-3 py-2.5 text-xs text-gray-700 border-b border-r border-gray-200 align-middle whitespace-nowrap ${entry.newlyAssigned ? 'border-l-4 border-l-amber-400' : ''}`}>{formatDate(entry.createdAt || entry.date)}</td>
               {showSalesPerson && (
                 <td className="px-3 py-2.5 border-b border-r border-gray-200 align-middle">
                   <p className="text-xs font-medium text-red-600">{getSalesPersonName(entry)}</p>
@@ -124,6 +135,14 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
               <td className="px-3 py-2.5 border-b border-r border-gray-200 align-middle">
                 <p className="text-xs font-semibold text-gray-900">{entry.companyName}</p>
                 <p className="text-xs text-gray-500">{entry.location}</p>
+                {entry.newlyAssigned && getAssignmentChain(entry).length > 1 && (
+                  <p className="text-[10px] text-amber-700 mt-0.5 flex items-center gap-1" title="Lead assignment history">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    <span className="font-medium">{getAssignmentChain(entry).join(' → ')}</span>
+                  </p>
+                )}
               </td>
               <td className="px-3 py-2.5 border-b border-r border-gray-200 align-middle">
                 <p className="text-xs font-medium text-gray-800">{entry.contactPerson}</p>

@@ -10,7 +10,10 @@
       "Bash(node -e \"require\\('./src/models/Supplier'\\);require\\('./src/controllers/supplierController'\\);require\\('./src/controllers/purchaseController'\\);require\\('./src/routes/purchaseRoutes'\\);require\\('./src/app'\\);console.log\\('OK'\\)\")",
       "Bash(node -e \"require\\('./src/app'\\);console.log\\('backend OK'\\)\")",
       "Bash(npm install *)",
-      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('exceljs:', p.dependencies.exceljs || 'MISSING'\\)\")"
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('exceljs:', p.dependencies.exceljs || 'MISSING'\\)\")",
+      "Bash(node -c src/models/SalesEntry.js)",
+      "Bash(node -c src/controllers/salesController.js)",
+      "Bash(node -c src/controllers/followUpController.js)"
     ],
     "additionalDirectories": [
       "d:\\OmTrax_CRM\\CRM_backend\\src\\utils",
