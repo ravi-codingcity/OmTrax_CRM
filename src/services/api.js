@@ -88,6 +88,8 @@ export const purchaseAPI = {
   createItem: (data) => api.post('/purchase/items', data),
   getSuppliers: (params = {}) => api.get('/purchase/suppliers', { params }),
   createSupplier: (data) => api.post('/purchase/suppliers', data),
+  getLocations: (params = {}) => api.get('/purchase/locations', { params }),
+  createLocation: (data) => api.post('/purchase/locations', data),
   getEntries: (params = {}) => api.get('/purchase/entries', { params }),
   getEntry: (id) => api.get(`/purchase/entries/${id}`),
   create: (data) => api.post('/purchase/entries', data),

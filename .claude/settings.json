@@ -13,7 +13,9 @@
       "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('exceljs:', p.dependencies.exceljs || 'MISSING'\\)\")",
       "Bash(node -c src/models/SalesEntry.js)",
       "Bash(node -c src/controllers/salesController.js)",
-      "Bash(node -c src/controllers/followUpController.js)"
+      "Bash(node -c src/controllers/followUpController.js)",
+      "Bash(cd d:/OmTrax_CRM && echo \"=== FRONTEND \\(purchase\\) ===\" && grep -rni \"categor\" my-project/src/pages/Purchase my-project/src/components/Purchase my-project/src/config/purchase.js my-project/src/context/PurchaseContext.jsx my-project/src/utils/purchaseExport.js 2>/dev/null | sed 's/:.*\\\\\\(categor[a-zA-Z]*\\\\\\)/ -> \\\\1/I' | sort -u; echo; echo \"=== BACKEND \\(purchase\\) ===\" && grep -rni \"categor\" CRM_backend/src/models/PurchaseEntry.js CRM_backend/src/controllers/purchaseController.js CRM_backend/src/services/purchaseService.js CRM_backend/src/controllers/itemController.js 2>/dev/null | head -20)",
+      "Bash(cd d:/OmTrax_CRM && echo \"=== stale 'category' in purchase frontend ===\" && grep -rniE \"\\\\bcategor\" my-project/src/pages/Purchase my-project/src/components/Purchase my-project/src/config/purchase.js my-project/src/utils/purchaseExport.js 2>/dev/null || echo \"NONE\"; echo; echo \"=== stale 'category' in purchase backend \\(entry flow\\) ===\" && grep -rniE \"\\\\bcategor\" CRM_backend/src/models/PurchaseEntry.js CRM_backend/src/services/purchaseService.js CRM_backend/src/controllers/purchaseController.js 2>/dev/null || echo \"NONE\")"
     ],
     "additionalDirectories": [
       "d:\\OmTrax_CRM\\CRM_backend\\src\\utils",

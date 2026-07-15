@@ -40,11 +40,16 @@ export const ROLES_BY_DEPARTMENT = {
   ],
   purchase: [
     { value: 'purchase_manager', label: 'Purchase Manager' },
+    { value: 'branch_manager', label: 'Branch Manager' },
+    { value: 'warehouse_manager', label: 'Warehouse Manager' },
   ],
 };
 
 // Roles that can view all entries within their department (vs. only their own)
-export const FULL_ACCESS_ROLES = ['admin', 'manager', 'hr_manager', 'hr_head', 'purchase_manager'];
+export const FULL_ACCESS_ROLES = [
+  'admin', 'manager', 'hr_manager', 'hr_head',
+  'purchase_manager', 'branch_manager', 'warehouse_manager',
+];
 
 export const getDepartment = (key) =>
   DEPARTMENTS.find((d) => d.key === key) || DEPARTMENTS[0];

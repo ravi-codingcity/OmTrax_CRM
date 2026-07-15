@@ -7,6 +7,7 @@ export const PurchaseProvider = ({ children }) => {
   const [entries, setEntries] = useState([]);
   const [items, setItems] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const fetchEntries = useCallback(async (params = {}) => {
@@ -57,6 +58,18 @@ export const PurchaseProvider = ({ children }) => {
       return { success: true, data: supplier };
     } catch (err) {
       return { success: false, message: err.response?.data?.message || 'Failed to add supplier' };
+    }
+  }, []);
+
+  const fetchLocations = useCallback(async () => {
+    try {
+      const res = await purchaseAPI.getLocations();
+      const list = res.data.data || [];
+      setLocations(list);
+      return list;
+    } catch (err) {
+      console.error('Error fetching storage locations:', err);
+      return [];
     }
   }, []);
 
@@ -157,10 +170,12 @@ export const PurchaseProvider = ({ children }) => {
         entries,
         items,
         suppliers,
+        locations,
         loading,
         fetchEntries,
         fetchItems,
         fetchSuppliers,
+        fetchLocations,
         createSupplier,
         fetchStats,
         fetchInventory,

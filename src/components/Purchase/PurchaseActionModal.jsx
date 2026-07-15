@@ -3,14 +3,17 @@ import { useState } from 'react';
 const today = () => new Date().toISOString().split('T')[0];
 
 // Combined modal for recording a Dispatch or a Return against a purchase entry.
+// Every dispatch must reference a Job Number; a remark is optional.
 const PurchaseActionModal = ({ action = 'dispatch', entry, onClose, onSubmit }) => {
   const isDispatch = action === 'dispatch';
   const netOut = (entry.totalDispatched || 0) - (entry.totalReturned || 0);
   const max = isDispatch ? entry.availableStock : netOut;
 
-  const [form, setForm] = useState({ date: today(), quantity: '', location: '' });
+  const [form, setForm] = useState({ date: today(), quantity: '', jobNumber: '', remark: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const setField = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,11 +21,21 @@ const PurchaseActionModal = ({ action = 'dispatch', entry, onClose, onSubmit }) 
     if (!qty || qty <= 0) { setError('Enter a quantity greater than 0'); return; }
     if (qty > max) { setError(`Only ${max} unit(s) available`); return; }
 
+    let payload;
+    if (isDispatch) {
+      if (!form.jobNumber.trim()) { setError('Job Number is required'); return; }
+      payload = {
+        dispatchDate: form.date,
+        quantity: qty,
+        jobNumber: form.jobNumber.trim(),
+        remark: form.remark.trim(),
+      };
+    } else {
+      payload = { returnDate: form.date, quantity: qty };
+    }
+
     setSubmitting(true);
     setError('');
-    const payload = isDispatch
-      ? { dispatchDate: form.date, quantity: qty, location: form.location.trim() }
-      : { returnDate: form.date, quantity: qty };
     const res = await onSubmit(payload);
     setSubmitting(false);
     if (res?.success) onClose();
@@ -30,10 +43,12 @@ const PurchaseActionModal = ({ action = 'dispatch', entry, onClose, onSubmit }) 
   };
 
   const btnCls = isDispatch ? 'bg-blue-600 hover:bg-blue-700' : 'bg-amber-600 hover:bg-amber-700';
+  const inputCls = 'w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500';
+  const label = 'block text-xs font-medium text-gray-600 mb-0.5';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <h2 className="text-base font-semibold text-gray-800">{isDispatch ? 'Record Dispatch' : 'Record Return'}</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600" aria-label="Close">
@@ -51,18 +66,36 @@ const PurchaseActionModal = ({ action = 'dispatch', entry, onClose, onSubmit }) 
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-0.5">{isDispatch ? 'Dispatch Date' : 'Return Date'}</label>
-              <input type="date" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-emerald-500" />
+              <label className={label}>{isDispatch ? 'Dispatch Date' : 'Return Date'}</label>
+              <input type="date" value={form.date} onChange={(e) => setField('date', e.target.value)} className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-0.5">Quantity</label>
-              <input type="number" min="0" step="any" max={max} value={form.quantity} onChange={(e) => setForm((p) => ({ ...p, quantity: e.target.value }))} className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-emerald-500" placeholder="0" />
+              <label className={label}>Quantity <span className="text-red-500">*</span></label>
+              <input type="number" min="0" step="any" max={max} value={form.quantity} onChange={(e) => setField('quantity', e.target.value)} className={inputCls} placeholder="0" />
             </div>
+
             {isDispatch && (
-              <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-0.5">Dispatch Location / Branch</label>
-                <input value={form.location} onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))} className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-emerald-500" placeholder="e.g. Delhi Branch" />
-              </div>
+              <>
+                <div className="col-span-2">
+                  <label className={label}>Job Number <span className="text-red-500">*</span></label>
+                  <input
+                    value={form.jobNumber}
+                    onChange={(e) => setField('jobNumber', e.target.value)}
+                    className={inputCls}
+                    placeholder="e.g. JOB-1024"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className={label}>Dispatch Remark <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <textarea
+                    value={form.remark}
+                    onChange={(e) => setField('remark', e.target.value)}
+                    rows={2}
+                    className={`${inputCls} resize-none`}
+                    placeholder="Additional notes about this dispatch..."
+                  />
+                </div>
+              </>
             )}
           </div>
 

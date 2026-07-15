@@ -6,7 +6,7 @@ import MainLayout from '../../components/Layout/MainLayout';
 import PullToRefresh from '../../components/Common/PullToRefresh';
 import CollapsibleSection from '../../components/Common/CollapsibleSection';
 import PurchaseTable from '../../components/Purchase/PurchaseTable';
-import HistoryModal from '../../components/Purchase/HistoryModal';
+import PurchaseDetailPanel from '../../components/Purchase/PurchaseDetailPanel';
 import ExportModal from '../../components/Purchase/ExportModal';
 import { stockStatus, roleTitle } from '../../config/purchase';
 import { getExportRange, exportPurchaseExcel } from '../../utils/purchaseExport';
@@ -25,7 +25,7 @@ const PurchaseDashboard = () => {
   const { entries, loading, fetchEntries, fetchStats, fetchInventory } = usePurchase();
   const [stats, setStats] = useState(null);
   const [inventory, setInventory] = useState([]);
-  const [historyEntry, setHistoryEntry] = useState(null);
+  const [detailEntry, setDetailEntry] = useState(null);
   const [showExport, setShowExport] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -127,7 +127,7 @@ const PurchaseDashboard = () => {
                   <thead>
                     <tr className="text-left text-[11px] font-semibold text-gray-500 uppercase border-b border-gray-200">
                       <th className="px-2 py-2">Item</th>
-                      <th className="px-2 py-2">Category</th>
+                      <th className="px-2 py-2">Storage Location</th>
                       <th className="px-2 py-2 text-center">Purchased</th>
                       <th className="px-2 py-2 text-center">Dispatched</th>
                       <th className="px-2 py-2 text-center">Returned</th>
@@ -140,7 +140,7 @@ const PurchaseDashboard = () => {
                       return (
                         <tr key={i.itemName} className="hover:bg-gray-50">
                           <td className="px-2 py-2 font-medium text-gray-800">{i.itemName}</td>
-                          <td className="px-2 py-2 text-gray-500">{i.category || '—'} {i.unit ? `(${i.unit})` : ''}</td>
+                          <td className="px-2 py-2 text-gray-500">{i.storageLocations?.length ? i.storageLocations.join(', ') : '—'} {i.unit ? `(${i.unit})` : ''}</td>
                           <td className="px-2 py-2 text-center text-gray-700 tabular-nums">{i.totalPurchased}</td>
                           <td className="px-2 py-2 text-center text-blue-600 tabular-nums">{i.totalDispatched}</td>
                           <td className="px-2 py-2 text-center text-amber-600 tabular-nums">{i.totalReturned}</td>
@@ -160,10 +160,12 @@ const PurchaseDashboard = () => {
               <h3 className="text-sm font-semibold text-gray-800">Recent Purchases</h3>
               <button onClick={() => navigate('/purchase/entries')} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">View all →</button>
             </div>
-            <PurchaseTable entries={recent} currentUser={user} onHistory={(e) => setHistoryEntry(e)} />
+            <PurchaseTable entries={recent} currentUser={user} onOpenDetails={(e) => setDetailEntry(e)} />
           </div>
 
-          {historyEntry && <HistoryModal entry={historyEntry} onClose={() => setHistoryEntry(null)} />}
+          {detailEntry && (
+            <PurchaseDetailPanel entry={detailEntry} currentUser={user} onClose={() => setDetailEntry(null)} />
+          )}
           {showExport && <ExportModal onClose={() => setShowExport(false)} onExport={handleExport} />}
         </div>
       </PullToRefresh>

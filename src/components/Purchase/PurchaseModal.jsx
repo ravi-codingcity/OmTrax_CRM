@@ -1,15 +1,15 @@
 import { useState, useMemo } from 'react';
 import SearchableSelect from '../Common/SearchableSelect';
-import { UNITS, CATEGORIES } from '../../config/purchase';
+import { UNITS, STORAGE_LOCATIONS } from '../../config/purchase';
 
 const toDateInput = (d) => (d ? new Date(d).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
 
-const PurchaseModal = ({ mode = 'add', entry = null, items = [], suppliers = [], onClose, onSubmit }) => {
+const PurchaseModal = ({ mode = 'add', entry = null, items = [], suppliers = [], locations = [], onClose, onSubmit }) => {
   const isEdit = mode === 'edit';
 
   const [form, setForm] = useState({
     itemName: entry?.itemName || '',
-    category: entry?.category || '',
+    storageLocation: entry?.storageLocation || '',
     supplier: entry?.supplier || '',
     purchaseDate: toDateInput(entry?.purchaseDate),
     quantityPurchased: entry?.quantityPurchased ?? '',
@@ -26,6 +26,16 @@ const PurchaseModal = ({ mode = 'add', entry = null, items = [], suppliers = [],
 
   const itemNames = useMemo(() => items.map((i) => i.name), [items]);
   const supplierNames = useMemo(() => suppliers.map((s) => s.name), [suppliers]);
+  // Merge saved locations with the predefined list (deduped, case-insensitive)
+  const locationNames = useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    [...locations.map((l) => l.name), ...STORAGE_LOCATIONS].forEach((n) => {
+      const k = n.toLowerCase();
+      if (!seen.has(k)) { seen.add(k); out.push(n); }
+    });
+    return out.sort((a, b) => a.localeCompare(b));
+  }, [locations]);
 
   const setField = (name, value) => {
     setForm((p) => ({ ...p, [name]: value }));
@@ -44,7 +54,6 @@ const PurchaseModal = ({ mode = 'add', entry = null, items = [], suppliers = [],
     setForm((p) => ({
       ...p,
       itemName: val,
-      category: match?.category || p.category,
       unit: match?.unit || p.unit,
     }));
     if (errors.itemName) setErrors((p) => ({ ...p, itemName: '' }));
@@ -73,7 +82,7 @@ const PurchaseModal = ({ mode = 'add', entry = null, items = [], suppliers = [],
     setApiError('');
     const payload = {
       itemName: form.itemName.trim(),
-      category: form.category.trim(),
+      storageLocation: form.storageLocation.trim(),
       supplier: form.supplier.trim(),
       purchaseDate: form.purchaseDate || null,
       quantityPurchased: Number(form.quantityPurchased) || 0,
@@ -124,8 +133,14 @@ const PurchaseModal = ({ mode = 'add', entry = null, items = [], suppliers = [],
               <p className="text-[10px] text-gray-400 mt-0.5">Not listed? Just type a new name — it will be added automatically.</p>
             </div>
             <div>
-              <label className={label}>Category</label>
-              <SearchableSelect value={form.category} onChange={(v) => setField('category', v)} options={CATEGORIES} placeholder="Category" />
+              <label className={label}>Storage Location</label>
+              <SearchableSelect
+                value={form.storageLocation}
+                onChange={(v) => setField('storageLocation', v)}
+                options={locationNames}
+                placeholder="Search or add location"
+              />
+              <p className="text-[10px] text-gray-400 mt-0.5">Where the material is stored. New warehouses/branches are saved automatically.</p>
             </div>
 
             <div>

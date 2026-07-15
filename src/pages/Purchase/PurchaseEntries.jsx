@@ -6,8 +6,8 @@ import PullToRefresh from '../../components/Common/PullToRefresh';
 import PurchaseTable from '../../components/Purchase/PurchaseTable';
 import PurchaseModal from '../../components/Purchase/PurchaseModal';
 import PurchaseActionModal from '../../components/Purchase/PurchaseActionModal';
-import HistoryModal from '../../components/Purchase/HistoryModal';
-import { CATEGORIES, canManagePurchase, stockStatus } from '../../config/purchase';
+import PurchaseDetailPanel from '../../components/Purchase/PurchaseDetailPanel';
+import { STORAGE_LOCATIONS, canManagePurchase, stockStatus, creatorName } from '../../config/purchase';
 
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const endOfDay = (d) => { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; };
@@ -37,13 +37,13 @@ const SORTS = [
 ];
 
 const defaultFilters = {
-  category: '', supplier: '', location: '', status: '', createdBy: '',
+  storageLocation: '', supplier: '', status: '', createdBy: '',
   dateField: 'purchase', datePreset: 'all', customStart: '', customEnd: '',
 };
 
 const PurchaseEntries = () => {
   const { user } = useAuth();
-  const { entries, items, suppliers, loading, fetchEntries, fetchItems, fetchSuppliers, addEntry, updateEntry, deleteEntry, dispatchItem, returnItem } = usePurchase();
+  const { entries, items, suppliers, locations, loading, fetchEntries, fetchItems, fetchSuppliers, fetchLocations, addEntry, updateEntry, deleteEntry, dispatchItem, returnItem } = usePurchase();
   const manage = canManagePurchase(user);
 
   const [search, setSearch] = useState('');
@@ -55,14 +55,14 @@ const PurchaseEntries = () => {
 
   const [modal, setModal] = useState({ open: false, mode: 'add', entry: null });
   const [action, setAction] = useState(null);
-  const [historyEntry, setHistoryEntry] = useState(null);
+  const [detailEntry, setDetailEntry] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
   const loadData = useCallback(async () => {
-    await Promise.all([fetchEntries(), fetchItems(), fetchSuppliers()]);
-  }, [fetchEntries, fetchItems, fetchSuppliers]);
+    await Promise.all([fetchEntries(), fetchItems(), fetchSuppliers(), fetchLocations()]);
+  }, [fetchEntries, fetchItems, fetchSuppliers, fetchLocations]);
   useEffect(() => { loadData(); }, [loadData]);
 
   const setFilter = (k, v) => setF((p) => ({ ...p, [k]: v }));
@@ -74,12 +74,16 @@ const PurchaseEntries = () => {
     entries.forEach((e) => { if (e.supplier) set.add(e.supplier); });
     return [...set].sort();
   }, [suppliers, entries]);
-  const locationOptions = useMemo(() => {
-    const set = new Set();
-    entries.forEach((e) => (e.dispatches || []).forEach((d) => { if (d.location) set.add(d.location); }));
-    return [...set].sort();
-  }, [entries]);
-  const createdByOptions = useMemo(() => [...new Set(entries.map((e) => e.createdByName).filter(Boolean))].sort(), [entries]);
+  // Storage locations: saved master + predefined + any used on existing entries
+  const storageLocationOptions = useMemo(() => {
+    const set = new Set([...locations.map((l) => l.name), ...STORAGE_LOCATIONS]);
+    entries.forEach((e) => { if (e.storageLocation) set.add(e.storageLocation); });
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [locations, entries]);
+  const createdByOptions = useMemo(
+    () => [...new Set(entries.map((e) => creatorName(e)).filter((n) => n && n !== '—'))].sort(),
+    [entries]
+  );
 
   const activeFilterCount = useMemo(
     () => Object.entries(f).filter(([k, v]) => v && !['dateField', 'datePreset', 'customStart', 'customEnd'].includes(k)).length
@@ -95,13 +99,12 @@ const PurchaseEntries = () => {
         e.itemName?.toLowerCase().includes(term) ||
         e.supplier?.toLowerCase().includes(term) ||
         e.invoiceNumber?.toLowerCase().includes(term) ||
-        e.category?.toLowerCase().includes(term)
+        e.storageLocation?.toLowerCase().includes(term)
       )) return false;
-      if (f.category && e.category !== f.category) return false;
+      if (f.storageLocation && e.storageLocation !== f.storageLocation) return false;
       if (f.supplier && e.supplier !== f.supplier) return false;
       if (f.status && stockStatus(e.availableStock).label !== f.status) return false;
-      if (f.createdBy && e.createdByName !== f.createdBy) return false;
-      if (f.location && !(e.dispatches || []).some((d) => d.location === f.location)) return false;
+      if (f.createdBy && creatorName(e) !== f.createdBy) return false;
       // Date range on the selected date field
       if (range) {
         if (f.dateField === 'purchase' && !inRange(e.purchaseDate || e.createdAt, range)) return false;
@@ -131,13 +134,16 @@ const PurchaseEntries = () => {
 
   const handleSubmit = async (payload) => {
     const res = modal.mode === 'add' ? await addEntry(payload) : await updateEntry(modal.entry._id, payload);
-    if (res.success) { flash(modal.mode === 'add' ? 'Purchase entry added!' : 'Purchase entry updated!'); fetchItems(); fetchSuppliers(); }
+    if (res.success) { flash(modal.mode === 'add' ? 'Purchase entry added!' : 'Purchase entry updated!'); fetchItems(); fetchSuppliers(); fetchLocations(); }
     return res;
   };
   const handleAction = async (payload) => {
     const { type, entry } = action;
     const res = type === 'dispatch' ? await dispatchItem(entry._id, payload) : await returnItem(entry._id, payload);
-    if (res.success) flash(type === 'dispatch' ? 'Dispatch recorded.' : 'Return recorded.');
+    if (res.success) {
+      flash(type === 'dispatch' ? 'Dispatch recorded.' : 'Return recorded.');
+      if (type === 'dispatch') fetchLocations(); // a new destination may have been added
+    }
     return res;
   };
   const confirmDelete = async () => {
@@ -180,7 +186,7 @@ const PurchaseEntries = () => {
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1 min-w-[180px]">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                <input type="text" placeholder="Search product, supplier, invoice, category..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500" />
+                <input type="text" placeholder="Search product, supplier, invoice, storage location..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500" />
               </div>
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={selectCls} title="Sort by">
                 {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
@@ -198,17 +204,13 @@ const PurchaseEntries = () => {
             {showFilters && (
               <div className="border-t border-gray-100 pt-2.5 space-y-2.5">
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                  <select value={f.category} onChange={(e) => setFilter('category', e.target.value)} className={selectCls}>
-                    <option value="">All categories</option>
-                    {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  <select value={f.storageLocation} onChange={(e) => setFilter('storageLocation', e.target.value)} className={selectCls}>
+                    <option value="">All storage locations</option>
+                    {storageLocationOptions.map((l) => <option key={l} value={l}>{l}</option>)}
                   </select>
                   <select value={f.supplier} onChange={(e) => setFilter('supplier', e.target.value)} className={selectCls}>
                     <option value="">All suppliers</option>
                     {supplierOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                  <select value={f.location} onChange={(e) => setFilter('location', e.target.value)} className={selectCls}>
-                    <option value="">All locations</option>
-                    {locationOptions.map((l) => <option key={l} value={l}>{l}</option>)}
                   </select>
                   <select value={f.status} onChange={(e) => setFilter('status', e.target.value)} className={selectCls}>
                     <option value="">All status</option>
@@ -244,11 +246,7 @@ const PurchaseEntries = () => {
           <PurchaseTable
             entries={pageItems}
             currentUser={user}
-            onDispatch={(e) => setAction({ type: 'dispatch', entry: e })}
-            onReturn={(e) => setAction({ type: 'return', entry: e })}
-            onHistory={(e) => setHistoryEntry(e)}
-            onEdit={(e) => setModal({ open: true, mode: 'edit', entry: e })}
-            onDelete={(e) => setDeleteTarget(e)}
+            onOpenDetails={(e) => setDetailEntry(e)}
           />
 
           {/* Pagination */}
@@ -267,10 +265,20 @@ const PurchaseEntries = () => {
 
           {/* Modals */}
           {modal.open && (
-            <PurchaseModal mode={modal.mode} entry={modal.entry} items={items} suppliers={suppliers} onClose={() => setModal({ open: false, mode: 'add', entry: null })} onSubmit={handleSubmit} />
+            <PurchaseModal mode={modal.mode} entry={modal.entry} items={items} suppliers={suppliers} locations={locations} onClose={() => setModal({ open: false, mode: 'add', entry: null })} onSubmit={handleSubmit} />
           )}
           {action && <PurchaseActionModal action={action.type} entry={action.entry} onClose={() => setAction(null)} onSubmit={handleAction} />}
-          {historyEntry && <HistoryModal entry={historyEntry} onClose={() => setHistoryEntry(null)} />}
+          {detailEntry && (
+            <PurchaseDetailPanel
+              entry={detailEntry}
+              currentUser={user}
+              onClose={() => setDetailEntry(null)}
+              onDispatch={(e) => { setDetailEntry(null); setAction({ type: 'dispatch', entry: e }); }}
+              onReturn={(e) => { setDetailEntry(null); setAction({ type: 'return', entry: e }); }}
+              onEdit={(e) => { setDetailEntry(null); setModal({ open: true, mode: 'edit', entry: e }); }}
+              onDelete={(e) => { setDetailEntry(null); setDeleteTarget(e); }}
+            />
+          )}
           {deleteTarget && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !busy && setDeleteTarget(null)}>
               <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
