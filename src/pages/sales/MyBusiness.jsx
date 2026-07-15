@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useBusiness } from '../../context/BusinessContext';
 import { useSales } from '../../context/SalesContext';
+import { useAuth } from '../../context/AuthContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import BusinessTable from '../../components/Business/BusinessTable';
 import BusinessModal from '../../components/Business/BusinessModal';
@@ -12,6 +14,10 @@ const formatCurrency = (amount) =>
 const MyBusiness = () => {
   const { businessEntries, loading, fetchBusinessEntries, addBusinessEntry, updateBusinessEntry } = useBusiness();
   const { salesEntries, fetchSalesEntries } = useSales();
+  const { user } = useAuth();
+  const isBusinessSub = user?.role === 'business_sub';
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -28,6 +34,15 @@ const MyBusiness = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Open the Add form pre-filled when arriving from a Sales Entry's ₹ action
+  useEffect(() => {
+    const pf = location.state?.prefillBusiness;
+    if (pf) {
+      setModal({ open: true, mode: 'add', entry: { client: pf.client || '', remarks: pf.remarks || '' } });
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location, navigate]);
 
   // Client suggestions: company names from Sales CRM + existing business clients
   const clientSuggestions = useMemo(() => {
@@ -163,8 +178,8 @@ const MyBusiness = () => {
             </p>
           </div>
 
-          {/* Table */}
-          <BusinessTable entries={paginatedEntries} showSalesPerson={false} onEdit={openEdit} />
+          {/* Table — sub-users may view & add only, so no edit action for them */}
+          <BusinessTable entries={paginatedEntries} showSalesPerson={false} onEdit={isBusinessSub ? undefined : openEdit} />
 
           {/* Pagination */}
           {totalPages > 1 && (

@@ -17,6 +17,8 @@ const Login = () => {
     if (user && !loading) {
       if (user.role === 'admin') {
         navigate('/select-department', { replace: true });
+      } else if (user.role === 'business_sub') {
+        navigate('/sales/business', { replace: true });
       } else if (user.department === 'hr') {
         navigate('/hr/dashboard', { replace: true });
       } else if (user.department === 'purchase') {
@@ -38,6 +40,8 @@ const Login = () => {
       if (result.success) {
         if (result.user.role === 'admin') {
           navigate('/select-department', { replace: true });
+        } else if (result.user.role === 'business_sub') {
+          navigate('/sales/business', { replace: true });
         } else if (result.user.department === 'hr') {
           navigate('/hr/dashboard', { replace: true });
         } else if (result.user.department === 'purchase') {

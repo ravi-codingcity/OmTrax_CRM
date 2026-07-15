@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useDepartment } from '../../context/DepartmentContext';
 
-const ProtectedRoute = ({ children, requiredRole, requiredDepartment, allowWithoutDepartment = false }) => {
+const ProtectedRoute = ({ children, requiredRole, requiredDepartment, allowWithoutDepartment = false, allowBusinessSub = false }) => {
   const { user, isAdmin, loading } = useAuth();
   const { hasSelectedDepartment, activeDepartment } = useDepartment();
 
@@ -27,6 +27,12 @@ const ProtectedRoute = ({ children, requiredRole, requiredDepartment, allowWitho
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Sandboxed sub-user: confined to the Business page only. Any other route
+  // bounces back to it. Removing the account removes this restriction entirely.
+  if (user.role === 'business_sub' && !allowBusinessSub) {
+    return <Navigate to="/sales/business" replace />;
   }
 
   if (requiredRole === 'admin' && !isAdmin()) {

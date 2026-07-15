@@ -59,6 +59,20 @@ export const RecruitmentProvider = ({ children }) => {
     }
   }, []);
 
+  // Generate an HR requirement from an "HR & Recruitment" sales entry.
+  // Returns { success, data, duplicate }. Idempotent on the backend.
+  const createFromSales = useCallback(async (salesEntryId, payload = {}) => {
+    try {
+      const res = await recruitmentAPI.createFromSales(salesEntryId, payload);
+      const entry = res.data.data || res.data;
+      setEntries((prev) => (prev.some((e) => e._id === entry._id) ? prev : [entry, ...prev]));
+      return { success: true, data: entry, duplicate: !!res.data.duplicate };
+    } catch (err) {
+      const message = err.response?.data?.message || 'Failed to send lead to HR Management';
+      return { success: false, message };
+    }
+  }, []);
+
   const updateEntry = useCallback(async (id, payload) => {
     try {
       const res = await recruitmentAPI.update(id, payload);
@@ -104,6 +118,7 @@ export const RecruitmentProvider = ({ children }) => {
         fetchRecruiters,
         fetchStats,
         addEntry,
+        createFromSales,
         updateEntry,
         reassignEntry,
         deleteEntry,

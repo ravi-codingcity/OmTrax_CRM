@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSales } from '../../context/SalesContext';
 import { useAuth } from '../../context/AuthContext';
+import useBusinessAction from '../../hooks/useBusinessAction';
 import MainLayout from '../../components/Layout/MainLayout';
 import SalesTable from '../../components/Common/SalesTable';
 import FollowUpModal from '../../components/Common/FollowUpModal';
@@ -102,6 +103,17 @@ const AllSales = () => {
   };
 
   const hasActiveFilters = searchTerm || salesPersonFilter || branchFilter || requirementFilter || statusFilter;
+
+  const runBusinessAction = useBusinessAction();
+  // ₹ action: HR leads create a requirement (toast); other leads navigate to
+  // the admin Business form pre-filled.
+  const handleBusinessAction = async (entry) => {
+    const res = await runBusinessAction(entry);
+    if (res.kind === 'hr' && res.message) {
+      setDeleteSuccessMessage(res.message);
+      setTimeout(() => setDeleteSuccessMessage(''), 3500);
+    }
+  };
 
   const handleViewFollowUp = (entry) => {
     setSelectedEntry(entry);
@@ -255,10 +267,11 @@ const AllSales = () => {
         </div>
 
         {/* Sales Table */}
-        <SalesTable 
-          entries={paginatedEntries} 
+        <SalesTable
+          entries={paginatedEntries}
           onViewFollowUp={handleViewFollowUp}
           onDelete={handleDelete}
+          onBusinessAction={handleBusinessAction}
           isAdmin={true}
         />
 

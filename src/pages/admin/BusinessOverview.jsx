@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useBusiness } from '../../context/BusinessContext';
 import { useSales } from '../../context/SalesContext';
 import MainLayout from '../../components/Layout/MainLayout';
@@ -60,6 +61,8 @@ const DATE_PRESETS = [
 const BusinessOverview = () => {
   const { businessEntries, loading, fetchBusinessEntries, addBusinessEntry, updateBusinessEntry, deleteBusinessEntry } = useBusiness();
   const { salesEntries, fetchSalesEntries } = useSales();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [salesPersonFilter, setSalesPersonFilter] = useState('');
@@ -79,6 +82,15 @@ const BusinessOverview = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Open the Add form pre-filled when arriving from a Sales Entry's ₹ action
+  useEffect(() => {
+    const pf = location.state?.prefillBusiness;
+    if (pf) {
+      setModal({ open: true, mode: 'add', entry: { client: pf.client || '', remarks: pf.remarks || '' } });
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location, navigate]);
 
   const clientSuggestions = useMemo(() => {
     const fromSales = salesEntries.map((e) => e.companyName).filter(Boolean);

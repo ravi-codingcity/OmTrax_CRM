@@ -23,6 +23,7 @@ import SalesAnalytics from './pages/sales/SalesAnalytics';
 import SalesVisit from './pages/SalesVisit';
 import BusinessOverview from './pages/admin/BusinessOverview';
 import MyBusiness from './pages/sales/MyBusiness';
+import MyHrRequirements from './pages/sales/MyHrRequirements';
 import HrDashboard from './pages/hr/HrDashboard';
 import HrRequirements from './pages/hr/HrRequirements';
 import HrAnalytics from './pages/hr/HrAnalytics';
@@ -135,8 +136,16 @@ function App() {
               <Route
                 path="/sales/business"
                 element={
-                  <ProtectedRoute requiredRole="salesperson">
+                  <ProtectedRoute requiredRole="salesperson" allowBusinessSub>
                     <MyBusiness />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/sales/hr-requirements"
+                element={
+                  <ProtectedRoute requiredRole="salesperson">
+                    <MyHrRequirements />
                   </ProtectedRoute>
                 }
               />

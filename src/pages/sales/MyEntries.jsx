@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import useBusinessAction from '../../hooks/useBusinessAction';
 import { useSales } from '../../context/SalesContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import SalesTable from '../../components/Common/SalesTable';
@@ -109,6 +110,17 @@ const MyEntries = () => {
   };
 
   const hasActiveFilters = searchTerm || statusFilter || branchFilter || requirementFilter;
+
+  const runBusinessAction = useBusinessAction();
+  // ₹ action: HR leads create a requirement (shows a toast); other leads
+  // navigate to the Business form, so no toast is needed here.
+  const handleBusinessAction = async (entry) => {
+    const res = await runBusinessAction(entry);
+    if (res.kind === 'hr' && res.message) {
+      setSuccessMessage(res.message);
+      setTimeout(() => setSuccessMessage(''), 3500);
+    }
+  };
 
   const handleViewFollowUp = (entry) => {
     setFollowUpEntry(entry);
@@ -409,11 +421,12 @@ const MyEntries = () => {
         </div>
 
         {/* Entries Table */}
-        <SalesTable 
-          entries={paginatedEntries} 
-          showSalesPerson={false} 
+        <SalesTable
+          entries={paginatedEntries}
+          showSalesPerson={false}
           onViewFollowUp={handleViewFollowUp}
           onAddFollowUp={handleAddFollowUp}
+          onBusinessAction={handleBusinessAction}
         />
 
         {/* Pagination Controls */}

@@ -1,6 +1,9 @@
 import { useState } from 'react';
 
-const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFollowUp = null, onAddFollowUp = null, onDelete = null, isAdmin = false }) => {
+// True when a lead's requirement routes to HR Management instead of Relocation Business
+const isHrRecruitmentLead = (entry) => (entry?.requirement || '').trim().toLowerCase() === 'hr & recruitment';
+
+const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFollowUp = null, onAddFollowUp = null, onDelete = null, onBusinessAction = null, isAdmin = false }) => {
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, entry: null });
 
   const handleDeleteClick = (entry) => {
@@ -114,7 +117,7 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
             <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Remark</th>
             <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Next Follow-up</th>
             <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-b-2 border-r border-gray-300">Status</th>
-            {(onEdit || onViewFollowUp || onAddFollowUp || (isAdmin && onDelete)) && (
+            {(onEdit || onViewFollowUp || onAddFollowUp || onBusinessAction || (isAdmin && onDelete)) && (
               <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300 w-32">Actions</th>
             )}
           </tr>
@@ -165,9 +168,19 @@ const SalesTable = ({ entries, showSalesPerson = true, onEdit = null, onViewFoll
                   {capitalizeStatus(entry.queryStatus)}
                 </span>
               </td>
-              {(onEdit || onViewFollowUp || onAddFollowUp || (isAdmin && onDelete)) && (
+              {(onEdit || onViewFollowUp || onAddFollowUp || onBusinessAction || (isAdmin && onDelete)) && (
                 <td className="px-3 py-2.5 border-b border-gray-200 align-middle text-center">
                   <div className="flex items-center justify-center gap-1">
+                    {onBusinessAction && (
+                      <button
+                        onClick={() => onBusinessAction(entry)}
+                        className="flex items-center justify-center h-6 w-6 rounded border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-bold text-sm leading-none transition-colors"
+                        title={isHrRecruitmentLead(entry) ? 'Send to HR Management' : 'Create Business entry'}
+                        aria-label="Business action"
+                      >
+                        ₹
+                      </button>
+                    )}
                     {onViewFollowUp && (
                       <button
                         onClick={() => onViewFollowUp(entry)}

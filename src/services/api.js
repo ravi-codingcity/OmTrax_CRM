@@ -108,6 +108,7 @@ export const recruitmentAPI = {
   getRecruiters: () => api.get('/recruitment/recruiters'),
   getById: (id) => api.get(`/recruitment/${id}`),
   create: (data) => api.post('/recruitment', data),
+  createFromSales: (salesEntryId, data = {}) => api.post(`/recruitment/from-sales/${salesEntryId}`, data),
   update: (id, data) => api.put(`/recruitment/${id}`, data),
   reassign: (id, data) => api.put(`/recruitment/${id}/reassign`, data),
   delete: (id) => api.delete(`/recruitment/${id}`),
