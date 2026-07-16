@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { usePurchase } from '../../context/PurchaseContext';
@@ -27,6 +27,8 @@ const PurchaseDashboard = () => {
   const [inventory, setInventory] = useState([]);
   const [detailEntry, setDetailEntry] = useState(null);
   const [showExport, setShowExport] = useState(false);
+  const [page, setPage] = useState(1);
+  const perPage = 20;
 
   const loadData = useCallback(async () => {
     const [, s, inv] = await Promise.all([fetchEntries(), fetchStats(), fetchInventory()]);
@@ -64,7 +66,15 @@ const PurchaseDashboard = () => {
     { label: 'Available Stock', value: s.availableStock || 0, color: 'text-green-600' },
   ];
 
-  const recent = [...entries].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 8);
+  // Recent purchases, newest first, paginated (20 per page)
+  const sortedEntries = useMemo(
+    () => [...entries].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+    [entries]
+  );
+  const totalPages = Math.ceil(sortedEntries.length / perPage);
+  const start = (page - 1) * perPage;
+  const pageItems = sortedEntries.slice(start, start + perPage);
+  useEffect(() => { setPage(1); }, [sortedEntries.length]);
 
   return (
     <MainLayout>
@@ -160,7 +170,21 @@ const PurchaseDashboard = () => {
               <h3 className="text-sm font-semibold text-gray-800">Recent Purchases</h3>
               <button onClick={() => navigate('/purchase/entries')} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">View all →</button>
             </div>
-            <PurchaseTable entries={recent} currentUser={user} onOpenDetails={(e) => setDetailEntry(e)} />
+            <PurchaseTable entries={pageItems} currentUser={user} onOpenDetails={(e) => setDetailEntry(e)} />
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+                <span className="text-xs text-gray-600">
+                  Showing {sortedEntries.length === 0 ? 0 : start + 1}–{Math.min(start + perPage, sortedEntries.length)} of {sortedEntries.length}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setPage(1)} disabled={page === 1} className="px-2 py-1 text-xs border border-gray-300 rounded disabled:opacity-50">First</button>
+                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="px-2 py-1 text-xs border border-gray-300 rounded disabled:opacity-50">Prev</button>
+                  <span className="px-2 text-xs font-medium text-gray-700">{page}/{totalPages}</span>
+                  <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="px-2 py-1 text-xs border border-gray-300 rounded disabled:opacity-50">Next</button>
+                  <button onClick={() => setPage(totalPages)} disabled={page === totalPages} className="px-2 py-1 text-xs border border-gray-300 rounded disabled:opacity-50">Last</button>
+                </div>
+              </div>
+            )}
           </div>
 
           {detailEntry && (

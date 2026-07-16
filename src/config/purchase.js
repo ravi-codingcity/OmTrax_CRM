@@ -7,7 +7,7 @@ export const UNITS = ['Piece', 'Box', 'Kg', 'Gram', 'Litre', 'Metre', 'Roll', 'P
 // selected (storage location AND dispatch destination). Users may add new ones,
 // which are saved to the master and appear in future suggestions — no code change.
 export const STORAGE_LOCATIONS = [
-  'Delhi',
+  'Delhi HO',
   'Chennai',
   'Mumbai',
   'Jaipur',
