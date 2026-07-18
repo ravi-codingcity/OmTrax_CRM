@@ -7,6 +7,9 @@ import MainLayout from '../../components/Layout/MainLayout';
 import SalesTable from '../../components/Common/SalesTable';
 import FollowUpModal from '../../components/Common/FollowUpModal';
 import PullToRefresh from '../../components/Common/PullToRefresh';
+import DownloadExcelModal, { DownloadIcon } from '../../components/Common/DownloadExcelModal';
+import { getStatusCounts } from '../../utils/salesExport';
+import { salesAPI } from '../../services/api';
 
 const AllSales = () => {
   const { salesEntries, loading, fetchSalesEntries, addFollowUp, deleteSalesEntry } = useSales();
@@ -24,6 +27,12 @@ const AllSales = () => {
 
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [modalMode, setModalMode] = useState('both');
+
+  // Download Excel Sheet (same lead buckets as the Salesperson export)
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [downloadFilter, setDownloadFilter] = useState('Total');
+  const [downloadMessage, setDownloadMessage] = useState(null); // { text, ok }
+  const [downloading, setDownloading] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -104,6 +113,49 @@ const AllSales = () => {
 
   const hasActiveFilters = searchTerm || salesPersonFilter || branchFilter || requirementFilter || statusFilter;
 
+  // Per-status counts across every salesperson's entries
+  const downloadCounts = useMemo(() => getStatusCounts(entries), [entries]);
+
+  // The CSV is built by the Admin-only export endpoint; we just save the file.
+  const handleDownloadExcel = async () => {
+    const count = downloadCounts[downloadFilter];
+    if (!count) {
+      setDownloadMessage({ text: `No ${downloadFilter} entries available to download.`, ok: false });
+      setTimeout(() => setDownloadMessage(null), 3000);
+      return;
+    }
+
+    setDownloading(true);
+    try {
+      const res = await salesAPI.exportEntries({ filter: downloadFilter });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv;charset=utf-8;' }));
+      const link = document.createElement('a');
+      const stamp = new Date().toISOString().split('T')[0];
+      link.href = url;
+      link.download = `AllSales_${downloadFilter}_${stamp}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setDownloadMessage({
+        text: `Downloaded ${count} ${downloadFilter} ${count === 1 ? 'entry' : 'entries'} successfully!`,
+        ok: true,
+      });
+      setShowDownloadModal(false);
+    } catch (err) {
+      console.error('Export failed:', err);
+      const denied = err.response?.status === 403;
+      setDownloadMessage({
+        text: denied ? 'You are not authorised to export sales entries.' : 'Export failed. Please try again.',
+        ok: false,
+      });
+    } finally {
+      setDownloading(false);
+      setTimeout(() => setDownloadMessage(null), 4000);
+    }
+  };
+
   const runBusinessAction = useBusinessAction();
   // ₹ action: HR leads create a requirement (toast); other leads navigate to
   // the admin Business form pre-filled.
@@ -175,16 +227,51 @@ const AllSales = () => {
               {loading ? 'Loading...' : `Showing ${filteredEntries.length} of ${entries.length} entries`}
             </p>
           </div>
-          <button
-            onClick={() => navigate('/admin/new-entry')}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm w-full sm:w-auto"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            Add Entry
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => {
+                setDownloadFilter('Total');
+                setShowDownloadModal(true);
+              }}
+              disabled={!entries.length}
+              title="Download all sales entries as Excel"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors shadow-sm w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <DownloadIcon className="h-4 w-4" />
+              Download Excel Sheet
+            </button>
+            <button
+              onClick={() => navigate('/admin/new-entry')}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm w-full sm:w-auto"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Add Entry
+            </button>
+          </div>
         </div>
+
+        {/* Download status message */}
+        {downloadMessage && (
+          <div
+            className={`px-4 py-3 rounded-lg flex items-center text-sm border ${
+              downloadMessage.ok
+                ? 'bg-green-50 border-green-200 text-green-700'
+                : 'bg-red-50 border-red-200 text-red-700'
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d={downloadMessage.ok ? 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' : 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'}
+              />
+            </svg>
+            {downloadMessage.text}
+          </div>
+        )}
 
         {/* Filter Controls - Consistent with Dashboard */}
         <div className="bg-white rounded-lg shadow-sm p-3 border border-gray-100">
@@ -315,6 +402,19 @@ const AllSales = () => {
               </button>
             </div>
           </div>
+        )}
+
+        {/* Download Excel Modal */}
+        {showDownloadModal && (
+          <DownloadExcelModal
+            counts={downloadCounts}
+            filter={downloadFilter}
+            onFilterChange={setDownloadFilter}
+            onDownload={handleDownloadExcel}
+            onClose={() => setShowDownloadModal(false)}
+            busy={downloading}
+            description="Select which leads you want to export. Includes every salesperson's entries."
+          />
         )}
 
         {/* Follow-Up Modal */}

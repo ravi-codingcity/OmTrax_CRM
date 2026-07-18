@@ -71,6 +71,8 @@ export const salesAPI = {
   getTodayFollowUps: () => api.get('/sales/follow-ups/today'),
   getOverdueFollowUps: () => api.get('/sales/follow-ups/overdue'),
   reassignLeads: (data) => api.post('/sales/reassign-leads', data),
+  // Admin only — the backend rejects non-admins with 403
+  exportEntries: (params = {}) => api.get('/sales/export', { params, responseType: 'blob' }),
 };
 
 // ==================== BUSINESS APIs ====================

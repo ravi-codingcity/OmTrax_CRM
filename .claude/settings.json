@@ -27,7 +27,11 @@
       "Bash(node -e \"require\\('./src/app'\\); require\\('./src/models/RecruitmentEntry'\\); require\\('./src/controllers/recruitmentController'\\); console.log\\('OK: backend loads clean'\\);\")",
       "Bash(node -e \"require\\('./src/controllers/recruitmentController'\\); console.log\\('backend OK'\\);\")",
       "Bash(cd d:/OmTrax_CRM && echo \"=== backend purchaseConstants STORAGE_LOCATIONS ===\" && grep -n \"STORAGE_LOCATIONS\" -A 15 CRM_backend/src/constants/purchaseConstants.js | head -25 *)",
-      "Bash(node -e \"const c=require\\('./src/constants/purchaseConstants'\\); console.log\\('Storage[0]:', c.STORAGE_LOCATIONS[0]\\); console.log\\('Has plain Delhi:', c.STORAGE_LOCATIONS.includes\\('Delhi'\\), '| Has Delhi HO:', c.STORAGE_LOCATIONS.includes\\('Delhi HO'\\)\\); require\\('./src/controllers/storageLocationController'\\); console.log\\('controller OK'\\);\")"
+      "Bash(node -e \"const c=require\\('./src/constants/purchaseConstants'\\); console.log\\('Storage[0]:', c.STORAGE_LOCATIONS[0]\\); console.log\\('Has plain Delhi:', c.STORAGE_LOCATIONS.includes\\('Delhi'\\), '| Has Delhi HO:', c.STORAGE_LOCATIONS.includes\\('Delhi HO'\\)\\); require\\('./src/controllers/storageLocationController'\\); console.log\\('controller OK'\\);\")",
+      "Bash(cd d:/OmTrax_CRM && ls CRM_backend/src/routes/ && echo \"=== sales routes ===\" && cat CRM_backend/src/routes/salesEntryRoutes.js 2>/dev/null || cat CRM_backend/src/routes/salesRoutes.js 2>/dev/null)",
+      "Bash(cd d:/OmTrax_CRM/CRM_backend && grep -n \"exports.getSalesEntries\" -A 45 src/controllers/salesController.js | head -55)",
+      "Read(//d/OmTrax_CRM/CRM_backend/**)",
+      "Bash(node -e \"const c=require\\('./src/controllers/salesController'\\); console.log\\('exportSalesEntries:', typeof c.exportSalesEntries\\); require\\('./src/routes/salesRoutes'\\); console.log\\('routes OK'\\);\")"
     ],
     "additionalDirectories": [
       "d:\\OmTrax_CRM\\CRM_backend\\src\\utils",
