@@ -1,7 +1,9 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://peachpuff-boar-650004.hostingersite.com/api';
+const API_BASE_URL = 'https://api.omtraxcrm.in/api';
 
+// https://api.omtraxcrm.in/
+// https://peachpuff-boar-650004.hostingersite.com/api
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
