@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import omtrax_logo from '../assets/OmTrax.png';
 
 const ResetPassword = () => {
+  const { accessKey } = useParams();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     username: '',
@@ -65,7 +66,7 @@ const ResetPassword = () => {
         username: formData.username,
         oldPassword: formData.oldPassword,
         newPassword: formData.newPassword,
-      });
+      }, accessKey);
       
       if (response.data.success) {
         setSuccessMessage('Password reset successfully! Redirecting to login...');

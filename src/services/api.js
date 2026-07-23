@@ -53,12 +53,21 @@ api.interceptors.response.use(
 );
 
 // ==================== AUTH APIs ====================
+// Sign Up / Reset Password are URL-authenticated. The key is taken from the page
+// URL and forwarded here — deliberately NOT stored in an env var, because Vite
+// inlines those into the public bundle where anyone could read it. The server
+// verifies the key and answers 404 when it is wrong.
+const authKeyHeader = (accessKey) => ({
+  headers: { 'x-auth-access-key': accessKey || '' },
+});
+
 export const authAPI = {
-  signup: (data) => api.post('/auth/signup', data),
+  signup: (data, accessKey) => api.post('/auth/signup', data, authKeyHeader(accessKey)),
   login: (data) => api.post('/auth/login', data),
   getMe: () => api.get('/auth/me'),
   updatePassword: (data) => api.put('/auth/update-password', data),
-  resetPassword: (data) => api.post('/auth/reset-password', data),
+  resetPassword: (data, accessKey) => api.post('/auth/reset-password', data, authKeyHeader(accessKey)),
+  verifyAccessKey: (accessKey) => api.get('/auth/access-check', authKeyHeader(accessKey)),
   getUsers: () => api.get('/auth/users'),
   updateUser: (id, data) => api.put(`/auth/users/${id}`, data),
 };
@@ -150,30 +159,6 @@ export const dashboardAPI = {
   getAnalytics: (params = {}) => api.get('/dashboard/analytics', { params }),
   getActivities: () => api.get('/dashboard/activities'),
   getSalespersonPerformance: () => api.get('/dashboard/salesperson-performance'),
-};
-
-// ==================== SALES VISIT APIs ====================
-export const salesVisitAPI = {
-  getAll: (params = {}) => api.get('/sales-visits', { params }),
-  getById: (id) => api.get(`/sales-visits/${id}`),
-  create: (data) => {
-    // Send JSON with base64 image - longer timeout for large images
-    return api.post('/sales-visits', {
-      companyName: data.companyName,
-      location: data.location,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      date: data.date,  // YYYY-MM-DD
-      time: data.time,  // HH:mm
-      imageBase64: data.imageBase64,
-    }, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      timeout: 120000,  // 2 minutes timeout for large image uploads
-    });
-  },
-  delete: (id) => api.delete(`/sales-visits/${id}`),
 };
 
 // ==================== BRANCH APIs ====================

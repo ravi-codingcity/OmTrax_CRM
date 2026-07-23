@@ -3,11 +3,11 @@ import { AuthProvider } from './context/AuthContext';
 import { DepartmentProvider } from './context/DepartmentContext';
 import { SalesProvider } from './context/SalesContext';
 import { NotificationProvider } from './context/NotificationContext';
-import { SalesVisitProvider } from './context/SalesVisitContext';
 import { BusinessProvider } from './context/BusinessContext';
 import { RecruitmentProvider } from './context/RecruitmentContext';
 import { PurchaseProvider } from './context/PurchaseContext';
 import ProtectedRoute from './components/Common/ProtectedRoute';
+import AuthKeyRoute from './components/Common/AuthKeyRoute';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ResetPassword from './pages/ResetPassword';
@@ -20,7 +20,6 @@ import AssignLeads from './pages/admin/AssignLeads';
 import NewEntry from './pages/sales/NewEntry';
 import MyEntries from './pages/sales/MyEntries';
 import SalesAnalytics from './pages/sales/SalesAnalytics';
-import SalesVisit from './pages/SalesVisit';
 import BusinessOverview from './pages/admin/BusinessOverview';
 import MyBusiness from './pages/sales/MyBusiness';
 import MyHrRequirements from './pages/sales/MyHrRequirements';
@@ -37,7 +36,6 @@ function App() {
       <DepartmentProvider>
       <NotificationProvider>
         <SalesProvider>
-          <SalesVisitProvider>
           <BusinessProvider>
           <RecruitmentProvider>
           <PurchaseProvider>
@@ -45,8 +43,25 @@ function App() {
             <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
-              <Route path="/108/signup" element={<Signup />} />
-              <Route path="/108/reset-password" element={<ResetPassword />} />
+
+              {/* URL-authenticated auth pages: the link carries a shared secret
+                  (VITE_AUTH_ACCESS_KEY) that is also verified by the API. */}
+              <Route
+                path="/auth/:accessKey/signup"
+                element={
+                  <AuthKeyRoute>
+                    <Signup />
+                  </AuthKeyRoute>
+                }
+              />
+              <Route
+                path="/auth/:accessKey/reset-password"
+                element={
+                  <AuthKeyRoute>
+                    <ResetPassword />
+                  </AuthKeyRoute>
+                }
+              />
 
               {/* Department selection (admin) */}
               <Route
@@ -202,16 +217,6 @@ function App() {
                 }
               />
 
-              {/* Sales Visit - Accessible by both Admin and Salesperson */}
-              <Route
-                path="/sales-visit"
-                element={
-                  <ProtectedRoute>
-                    <SalesVisit />
-                  </ProtectedRoute>
-                }
-              />
-
               {/* Redirect root to login */}
               <Route path="/" element={<Navigate to="/login" replace />} />
               
@@ -222,7 +227,6 @@ function App() {
           </PurchaseProvider>
           </RecruitmentProvider>
           </BusinessProvider>
-          </SalesVisitProvider>
         </SalesProvider>
       </NotificationProvider>
       </DepartmentProvider>

@@ -31,7 +31,26 @@
       "Bash(cd d:/OmTrax_CRM && ls CRM_backend/src/routes/ && echo \"=== sales routes ===\" && cat CRM_backend/src/routes/salesEntryRoutes.js 2>/dev/null || cat CRM_backend/src/routes/salesRoutes.js 2>/dev/null)",
       "Bash(cd d:/OmTrax_CRM/CRM_backend && grep -n \"exports.getSalesEntries\" -A 45 src/controllers/salesController.js | head -55)",
       "Read(//d/OmTrax_CRM/CRM_backend/**)",
-      "Bash(node -e \"const c=require\\('./src/controllers/salesController'\\); console.log\\('exportSalesEntries:', typeof c.exportSalesEntries\\); require\\('./src/routes/salesRoutes'\\); console.log\\('routes OK'\\);\")"
+      "Bash(node -e \"const c=require\\('./src/controllers/salesController'\\); console.log\\('exportSalesEntries:', typeof c.exportSalesEntries\\); require\\('./src/routes/salesRoutes'\\); console.log\\('routes OK'\\);\")",
+      "Bash(node -e \"const{ROLES_BY_DEPARTMENT}=require\\('./src/utils/department'\\);console.log\\(JSON.stringify\\(ROLES_BY_DEPARTMENT\\)\\)\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\(Object.keys\\(p.dependencies||{}\\).join\\(', '\\)\\)\")",
+      "Bash(node -e \"require\\('./src/app'\\); require\\('./src/middleware/rateLimit'\\); console.log\\('backend OK'\\);\")",
+      "Bash(cd d:/OmTrax_CRM && echo \"=== FRONTEND: salesvisit/sales-visit refs ===\" && grep -rln -i \"salesvisit\\\\|sales-visit\\\\|sales visit\" my-project/src/ && echo \"\" && echo \"=== BACKEND: salesvisit refs ===\" && grep -rln -i \"salesvisit\\\\|sales-visit\" CRM_backend/src/ && echo \"\" && echo \"=== BACKEND: cloudinary/multer refs ===\" && grep -rln -i \"cloudinary\\\\|multer\" CRM_backend/src/ CRM_backend/*.js 2>/dev/null)",
+      "Bash(cd d:/OmTrax_CRM && echo \"=== backend app.js ===\" && grep -n -i \"salesvisit\\\\|sales-visit\\\\|cloudinary\" CRM_backend/src/app.js && echo \"=== backend routes/index.js ===\" && grep -n -i \"salesvisit\\\\|visit\" CRM_backend/src/routes/index.js && echo \"=== frontend api.js ===\" && grep -n -i \"salesvisit\\\\|visit\" my-project/src/services/api.js && echo \"=== App.jsx ===\" && grep -n -i \"salesvisit\\\\|sales-visit\" my-project/src/App.jsx && echo \"=== Header.jsx ===\" && grep -n -i \"sales-visit\\\\|Sales Visit\" my-project/src/components/Layout/Header.jsx)",
+      "Bash(cd d:/OmTrax_CRM; echo \"=== routes/index.js ===\"; grep -n -i \"visit\" CRM_backend/src/routes/index.js; echo \"=== frontend api.js ===\"; grep -n -i \"visit\" my-project/src/services/api.js; echo \"=== App.jsx ===\"; grep -n -i \"salesvisit\\\\|sales-visit\" my-project/src/App.jsx; echo \"=== Header.jsx ===\"; grep -n -i \"sales-visit\\\\|Sales Visit\" my-project/src/components/Layout/Header.jsx; echo \"=== AddSalesVisitModal users ===\"; grep -rn \"AddSalesVisitModal\" my-project/src/)",
+      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(24\\).toString\\('base64url'\\)\\)\")",
+      "Bash(sed -i \"/label: 'Add User'/d\" src/components/Layout/Header.jsx)",
+      "Bash(sed -i \"s/, 'Add User'//\" src/components/Layout/Header.jsx)",
+      "Bash(sed -i \"s|import { Link } from 'react-router-dom';|import { Link, useParams } from 'react-router-dom';|\" src/pages/Signup.jsx)",
+      "Bash(sed -i \"s|const \\\\[formData, setFormData\\\\] = useState\\(EMPTY_FORM\\);|const { accessKey } = useParams\\(\\);\\\\n  const [formData, setFormData] = useState\\(EMPTY_FORM\\);|\" src/pages/Signup.jsx)",
+      "Bash(sed -i \"s|const response = await authAPI.signup\\(submitData\\);|const response = await authAPI.signup\\(submitData, accessKey\\);|\" src/pages/Signup.jsx)",
+      "Bash(sed -i \"s|  const { accessKey } = useParams\\(\\);|  const navigate = useNavigate\\(\\);\\\\n  const { accessKey } = useParams\\(\\);|\" src/pages/Signup.jsx)",
+      "Bash(sed -i \"s|              <Link to=\\\\\"/admin/dashboard\\\\\" className=\\\\\"text-blue-600 hover:text-blue-700 hover:underline font-medium\\\\\">\\\\n                ← Back to Dashboard|X|\" src/pages/Signup.jsx)",
+      "Bash(sed -i \"s|import { useNavigate, Link } from 'react-router-dom';|import { useNavigate, useParams, Link } from 'react-router-dom';|\" src/pages/ResetPassword.jsx)",
+      "Bash(sed -i \"0,/const ResetPassword = \\(\\) => {/s//const ResetPassword = \\(\\) => {\\\\n  const { accessKey } = useParams\\(\\);/\" src/pages/ResetPassword.jsx)",
+      "Bash(npm prune *)",
+      "Bash(grep -v \"set-state-in-effect|Calling setState|Effects are intended|Update external|Subscribe for|^\\\\s*$\")",
+      "Bash(grep -E \"^[A-Z]:\\\\\\\\\\\\\\\\|^\\\\S*\\\\.jsx\")"
     ],
     "additionalDirectories": [
       "d:\\OmTrax_CRM\\CRM_backend\\src\\utils",
@@ -42,7 +61,8 @@
       "d:\\OmTrax_CRM\\CRM_backend\\src\\controllers",
       "d:\\OmTrax_CRM\\CRM_backend\\src\\routes",
       "d:\\OmTrax_CRM\\CRM_backend\\src",
-      "d:\\OmTrax_CRM\\CRM_backend\\scripts"
+      "d:\\OmTrax_CRM\\CRM_backend\\scripts",
+      "d:\\OmTrax_CRM\\CRM_backend\\src\\config"
     ]
   }
 }

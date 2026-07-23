@@ -1,22 +1,34 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { authAPI } from '../services/api';
-import { DEPARTMENTS, ROLES_BY_DEPARTMENT, DEFAULT_DEPARTMENT } from '../config/departments';
+import { DEPARTMENTS, ROLES_BY_DEPARTMENT as ALL_ROLES_BY_DEPARTMENT, DEFAULT_DEPARTMENT } from '../config/departments';
 import omtrax_logo from '../assets/OmTrax.png';
+
+// Admin accounts are never self-registered — the backend rejects them — so the
+// role is not offered here either.
+const ROLES_BY_DEPARTMENT = Object.fromEntries(
+  Object.entries(ALL_ROLES_BY_DEPARTMENT).map(([dept, roles]) => [
+    dept,
+    roles.filter((r) => r.value !== 'admin'),
+  ])
+);
+
+const EMPTY_FORM = {
+  username: '',
+  password: '',
+  confirmPassword: '',
+  name: '',
+  email: '',
+  department: DEFAULT_DEPARTMENT,
+  role: ROLES_BY_DEPARTMENT[DEFAULT_DEPARTMENT][0].value,
+  branch: '',
+  phoneNumber: '',
+};
 
 const Signup = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    username: '',
-    password: '',
-    confirmPassword: '',
-    name: '',
-    email: '',
-    department: DEFAULT_DEPARTMENT,
-    role: ROLES_BY_DEPARTMENT[DEFAULT_DEPARTMENT][0].value,
-    branch: '',
-    phoneNumber: '',
-  });
+  const { accessKey } = useParams();
+  const [formData, setFormData] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -87,14 +99,15 @@ const Signup = () => {
 
     setIsLoading(true);
     try {
-      const { confirmPassword, ...submitData } = formData;
-      const response = await authAPI.signup(submitData);
+      const submitData = { ...formData };
+      delete submitData.confirmPassword; // client-side check only
+      const response = await authAPI.signup(submitData, accessKey);
       
       if (response.data.success) {
         setSuccessMessage('Account created successfully! Redirecting to login...');
-        setTimeout(() => {
-          navigate('/login');
-        }, 2000);
+        setFormData(EMPTY_FORM);
+        setErrors({});
+        setTimeout(() => navigate('/login'), 2000);
       }
     } catch (err) {
       setApiError(err.response?.data?.message || 'Registration failed. Please try again.');
