@@ -50,7 +50,22 @@
       "Bash(sed -i \"0,/const ResetPassword = \\(\\) => {/s//const ResetPassword = \\(\\) => {\\\\n  const { accessKey } = useParams\\(\\);/\" src/pages/ResetPassword.jsx)",
       "Bash(npm prune *)",
       "Bash(grep -v \"set-state-in-effect|Calling setState|Effects are intended|Update external|Subscribe for|^\\\\s*$\")",
-      "Bash(grep -E \"^[A-Z]:\\\\\\\\\\\\\\\\|^\\\\S*\\\\.jsx\")"
+      "Bash(grep -E \"^[A-Z]:\\\\\\\\\\\\\\\\|^\\\\S*\\\\.jsx\")",
+      "Bash(curl -s -m 15 -i https://api.omtraxcrm.in/api/health)",
+      "Bash(curl -s -m 15 -i -X OPTIONS https://api.omtraxcrm.in/api/auth/login -H \"Origin: https://omtraxcrm.in\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: content-type\")",
+      "Bash(curl -s -m 15 -i https://api.omtraxcrm.in/)",
+      "Bash(curl -s -m 15 -o /dev/null -w \"omtraxcrm.in/api/health -> HTTP %{http_code}\\\\n\" https://omtraxcrm.in/api/health)",
+      "Bash(cd d:/OmTrax_CRM && echo \"=== frontend .htaccess files in repo ===\" && find my-project -name \".htaccess\" 2>/dev/null | grep -v node_modules; echo \"--- public/.htaccess content \\(if any\\) ---\"; cat my-project/public/.htaccess 2>/dev/null || echo \"\\(none in public/\\)\"; echo \"\"; echo \"=== any .htaccess in backend repo ===\"; find CRM_backend -name \".htaccess\" 2>/dev/null | grep -v node_modules || echo \"\\(none\\)\")",
+      "Bash(node -e \"const p=require\\('./CRM_backend/package.json'\\); console.log\\('main:',p.main\\); console.log\\('scripts:',JSON.stringify\\(p.scripts\\)\\); console.log\\('engines:',JSON.stringify\\(p.engines||'\\(none\\)'\\)\\); console.log\\('type:',p.type||'commonjs \\(default\\)'\\)\")",
+      "Bash(node -e \"const p=require\\('./my-project/package.json'\\); console.log\\('scripts:',JSON.stringify\\(p.scripts\\)\\)\")",
+      "Bash(curl -s -m 15 -D - https://api.omtraxcrm.in/ -o /tmp/root.txt)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -m 15 -D - https://api.omtraxcrm.in/api/health -o /tmp/h.txt)",
+      "Bash(curl -s -m 15 -D - -o /dev/null -X OPTIONS https://api.omtraxcrm.in/api/auth/login -H \"Origin: https://omtraxcrm.in\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: content-type\")",
+      "Bash(mkdir -p /c/Users/Ravi/AppData/Local/Temp/claude/d--OmTrax-CRM-my-project/9c0c612e-f6a5-4436-8b90-52dc4f640549/scratchpad)",
+      "Bash(echo \"=== DNS resolve crmapi.omtraxcrm.in ===\")",
+      "Bash(nslookup crmapi.omtraxcrm.in)",
+      "Bash(sed -i 's/api\\\\.omtraxcrm\\\\.in/crmapi.omtraxcrm.in/g' CRM_backend/.htaccess my-project/public/.htaccess)"
     ],
     "additionalDirectories": [
       "d:\\OmTrax_CRM\\CRM_backend\\src\\utils",
@@ -62,7 +77,8 @@
       "d:\\OmTrax_CRM\\CRM_backend\\src\\routes",
       "d:\\OmTrax_CRM\\CRM_backend\\src",
       "d:\\OmTrax_CRM\\CRM_backend\\scripts",
-      "d:\\OmTrax_CRM\\CRM_backend\\src\\config"
+      "d:\\OmTrax_CRM\\CRM_backend\\src\\config",
+      "d:\\OmTrax_CRM\\CRM_backend"
     ]
   }
 }

@@ -1,9 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://api.omtraxcrm.in/api';
+// Backend API base. The API is hosted on the crmapi subdomain.
+const API_BASE_URL = 'https://crmapi.omtraxcrm.in/api';
 
-// https://api.omtraxcrm.in/
-// https://peachpuff-boar-650004.hostingersite.com/api
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,

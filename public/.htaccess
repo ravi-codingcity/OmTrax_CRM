@@ -2,6 +2,12 @@
 # OmTrax CRM — React (Vite) single-page app
 # Deployed on Hostinger (Apache / LiteSpeed, both read .htaccess).
 #
+# ⚠️  FRONTEND HOST ONLY (omtraxcrm.in / public_html).
+#     DO NOT put this file — or any React build files — in the API subdomain
+#     (crmapi.omtraxcrm.in) document root. Its "RewriteRule . /index.html" and
+#     "ErrorDocument 404 /index.html" will hijack every /api request before
+#     it reaches the Node/Passenger app and break the entire API.
+#
 # Vite copies everything in /public into /dist, so this file ships with the
 # build. Upload it alongside index.html in the site root (public_html).
 #
@@ -20,7 +26,7 @@
   RewriteCond %{HTTP:X-Forwarded-Proto} !https
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-  # The API lives on api.omtraxcrm.in. Never rewrite /api to the SPA shell —
+  # The API lives on crmapi.omtraxcrm.in. Never rewrite /api to the SPA shell —
   # an API path should fail loudly, not silently return HTML.
   RewriteCond %{REQUEST_URI} ^/api/ [NC]
   RewriteRule ^ - [L,R=404]
