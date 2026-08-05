@@ -101,6 +101,7 @@ export const purchaseAPI = {
   create: (data) => api.post('/purchase/entries', data),
   update: (id, data) => api.put(`/purchase/entries/${id}`, data),
   delete: (id) => api.delete(`/purchase/entries/${id}`),
+  receive: (id, data) => api.post(`/purchase/entries/${id}/receive`, data),
   dispatch: (id, data) => api.post(`/purchase/entries/${id}/dispatch`, data),
   return: (id, data) => api.post(`/purchase/entries/${id}/return`, data),
   getInventory: () => api.get('/purchase/inventory'),

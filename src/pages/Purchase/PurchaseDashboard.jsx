@@ -8,7 +8,8 @@ import CollapsibleSection from '../../components/Common/CollapsibleSection';
 import PurchaseTable from '../../components/Purchase/PurchaseTable';
 import PurchaseDetailPanel from '../../components/Purchase/PurchaseDetailPanel';
 import ExportModal from '../../components/Purchase/ExportModal';
-import { stockStatus, roleTitle } from '../../config/purchase';
+import ReceiveModal from '../../components/Purchase/ReceiveModal';
+import { stockStatus, roleTitle, canReceive, formatQuantity } from '../../config/purchase';
 import { getExportRange, exportPurchaseExcel } from '../../utils/purchaseExport';
 
 const inr = (n) => {
@@ -22,13 +23,29 @@ const inr = (n) => {
 const PurchaseDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { entries, loading, fetchEntries, fetchStats, fetchInventory } = usePurchase();
+  const { entries, loading, fetchEntries, fetchStats, fetchInventory, receiveEntry } = usePurchase();
   const [stats, setStats] = useState(null);
   const [inventory, setInventory] = useState([]);
   const [detailEntry, setDetailEntry] = useState(null);
   const [showExport, setShowExport] = useState(false);
+  const [receiveTarget, setReceiveTarget] = useState(null);
+  const [flashMsg, setFlashMsg] = useState('');
+  const [awaitingOpen, setAwaitingOpen] = useState(false); // collapsed by default
   const [page, setPage] = useState(1);
   const perPage = 20;
+
+  // Materials awaiting this user's receipt confirmation (location managers/admin)
+  const pendingForMe = useMemo(() => entries.filter((e) => canReceive(user, e)), [entries, user]);
+
+  const handleReceive = async (status, note) => {
+    const res = await receiveEntry(receiveTarget._id, { status, note });
+    if (res.success) {
+      setFlashMsg(`Material marked ${status === 'received' ? 'Received' : 'Not Received'}.`);
+      setTimeout(() => setFlashMsg(''), 3500);
+      loadData();
+    }
+    return res;
+  };
 
   const loadData = useCallback(async () => {
     const [, s, inv] = await Promise.all([fetchEntries(), fetchStats(), fetchInventory()]);
@@ -129,8 +146,55 @@ const PurchaseDashboard = () => {
             </div>
           )}
 
+          {flashMsg && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2.5 rounded-xl text-sm">{flashMsg}</div>
+          )}
+
+          {/* Pending receipt inbox — location manager / admin. Collapsed by
+              default; only rendered when there are pending confirmations. */}
+          {pendingForMe.length > 0 && (
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-xl overflow-hidden shadow-sm">
+              <button
+                type="button"
+                onClick={() => setAwaitingOpen((o) => !o)}
+                aria-expanded={awaitingOpen}
+                className="w-full flex items-center gap-2 px-3 sm:px-4 py-3 text-left hover:bg-amber-100/60 transition-colors"
+              >
+                <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                </span>
+                <h3 className="text-sm font-semibold text-amber-900 flex-1">Materials Awaiting Your Confirmation</h3>
+                <span className="text-xs font-bold text-white bg-amber-500 rounded-full px-2 py-0.5 flex-shrink-0">{pendingForMe.length}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 text-amber-700 flex-shrink-0 transition-transform ${awaitingOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {awaitingOpen && (
+                <div className="px-3 sm:px-4 pb-3 space-y-2">
+                  {pendingForMe.map((e) => (
+                    <div key={e._id} className="bg-white rounded-lg border border-amber-200 px-3 py-2.5 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{e.itemName}</p>
+                        <p className="text-[11px] text-gray-500 truncate">
+                          {formatQuantity(e.quantityPurchased, e.unit)} · {e.storageLocation || 'No location'} · from {e.createdByName || e.createdBy?.name || '—'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setReceiveTarget(e)}
+                        className="flex-shrink-0 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700"
+                      >
+                        Confirm Receipt
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Inventory summary */}
-          <CollapsibleSection title="Inventory Summary" badge={inventory.length} defaultOpen>
+          <CollapsibleSection title="Inventory Summary" badge={inventory.length}>
             {inventory.length ? (
               <div className="overflow-x-auto -mx-1">
                 <table className="w-full text-xs">
@@ -188,7 +252,15 @@ const PurchaseDashboard = () => {
           </div>
 
           {detailEntry && (
-            <PurchaseDetailPanel entry={detailEntry} currentUser={user} onClose={() => setDetailEntry(null)} />
+            <PurchaseDetailPanel
+              entry={detailEntry}
+              currentUser={user}
+              onClose={() => setDetailEntry(null)}
+              onReceive={canReceive(user, detailEntry) ? (e) => { setDetailEntry(null); setReceiveTarget(e); } : undefined}
+            />
+          )}
+          {receiveTarget && (
+            <ReceiveModal entry={receiveTarget} onClose={() => setReceiveTarget(null)} onSubmit={handleReceive} />
           )}
           {showExport && <ExportModal onClose={() => setShowExport(false)} onExport={handleExport} />}
         </div>

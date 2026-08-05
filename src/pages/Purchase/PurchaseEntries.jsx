@@ -7,6 +7,7 @@ import PurchaseTable from '../../components/Purchase/PurchaseTable';
 import PurchaseModal from '../../components/Purchase/PurchaseModal';
 import PurchaseActionModal from '../../components/Purchase/PurchaseActionModal';
 import PurchaseDetailPanel from '../../components/Purchase/PurchaseDetailPanel';
+import ReceiveModal from '../../components/Purchase/ReceiveModal';
 import { STORAGE_LOCATIONS, canManagePurchase, stockStatus, creatorName } from '../../config/purchase';
 
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
@@ -43,7 +44,7 @@ const defaultFilters = {
 
 const PurchaseEntries = () => {
   const { user } = useAuth();
-  const { entries, items, suppliers, locations, loading, fetchEntries, fetchItems, fetchSuppliers, fetchLocations, addEntry, updateEntry, deleteEntry, dispatchItem, returnItem } = usePurchase();
+  const { entries, items, suppliers, locations, loading, fetchEntries, fetchItems, fetchSuppliers, fetchLocations, addEntry, updateEntry, deleteEntry, receiveEntry, dispatchItem, returnItem } = usePurchase();
   const manage = canManagePurchase(user);
 
   const [search, setSearch] = useState('');
@@ -55,6 +56,7 @@ const PurchaseEntries = () => {
 
   const [modal, setModal] = useState({ open: false, mode: 'add', entry: null });
   const [action, setAction] = useState(null);
+  const [receiveTarget, setReceiveTarget] = useState(null);
   const [detailEntry, setDetailEntry] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [message, setMessage] = useState('');
@@ -144,6 +146,11 @@ const PurchaseEntries = () => {
       flash(type === 'dispatch' ? 'Dispatch recorded.' : 'Return recorded.');
       if (type === 'dispatch') fetchLocations(); // a new destination may have been added
     }
+    return res;
+  };
+  const handleReceive = async (status, note) => {
+    const res = await receiveEntry(receiveTarget._id, { status, note });
+    if (res.success) flash(`Material marked ${status === 'received' ? 'Received' : 'Not Received'}.`);
     return res;
   };
   const confirmDelete = async () => {
@@ -267,12 +274,14 @@ const PurchaseEntries = () => {
           {modal.open && (
             <PurchaseModal mode={modal.mode} entry={modal.entry} items={items} suppliers={suppliers} locations={locations} onClose={() => setModal({ open: false, mode: 'add', entry: null })} onSubmit={handleSubmit} />
           )}
-          {action && <PurchaseActionModal action={action.type} entry={action.entry} onClose={() => setAction(null)} onSubmit={handleAction} />}
+          {action && <PurchaseActionModal action={action.type} entry={action.entry} locations={storageLocationOptions} onClose={() => setAction(null)} onSubmit={handleAction} />}
+          {receiveTarget && <ReceiveModal entry={receiveTarget} onClose={() => setReceiveTarget(null)} onSubmit={handleReceive} />}
           {detailEntry && (
             <PurchaseDetailPanel
               entry={detailEntry}
               currentUser={user}
               onClose={() => setDetailEntry(null)}
+              onReceive={(e) => { setDetailEntry(null); setReceiveTarget(e); }}
               onDispatch={(e) => { setDetailEntry(null); setAction({ type: 'dispatch', entry: e }); }}
               onReturn={(e) => { setDetailEntry(null); setAction({ type: 'return', entry: e }); }}
               onEdit={(e) => { setDetailEntry(null); setModal({ open: true, mode: 'edit', entry: e }); }}

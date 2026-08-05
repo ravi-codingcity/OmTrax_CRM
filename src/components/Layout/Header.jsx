@@ -254,6 +254,27 @@ const Header = () => {
       );
     }
 
+    // Purchase location-tracking notifications
+    if (notification.type?.startsWith('purchase_')) {
+      const meta = {
+        purchase_receipt_request: { label: '📦 Awaiting Receipt', color: 'text-amber-600' },
+        purchase_received: { label: '✅ Material Received', color: 'text-green-600' },
+        purchase_not_received: { label: '❌ Material Not Received', color: 'text-red-600' },
+        purchase_dispatch: { label: '🚚 Material Dispatched', color: 'text-blue-600' },
+        purchase_return: { label: '↩️ Material Returned', color: 'text-amber-600' },
+      }[notification.type] || { label: 'Purchase Update', color: 'text-gray-600' };
+      return (
+        <>
+          <p className="text-sm text-gray-800">
+            <span className={`font-semibold ${meta.color}`}>{meta.label}</span>
+            {getSalesPersonName() !== 'Unknown' && <><span className="text-gray-600"> · </span><span className="font-medium">{getSalesPersonName()}</span></>}
+          </p>
+          <p className="text-xs text-gray-500 mt-1 truncate">{notification.companyName}</p>
+          {notification.remark && <p className="text-xs text-gray-500 mt-0.5 truncate">{notification.remark}</p>}
+        </>
+      );
+    }
+
     // New sales entry notification (Admin only)
     if (notification.type === 'new_entry' || notification.type === 'sales_entry') {
       return (

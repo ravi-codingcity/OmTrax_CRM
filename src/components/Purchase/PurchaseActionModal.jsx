@@ -4,14 +4,17 @@ const today = () => new Date().toISOString().split('T')[0];
 
 // Combined modal for recording a Dispatch or a Return against a purchase entry.
 // Every dispatch must reference a Job Number; a remark is optional.
-const PurchaseActionModal = ({ action = 'dispatch', entry, onClose, onSubmit }) => {
+const PurchaseActionModal = ({ action = 'dispatch', entry, locations = [], onClose, onSubmit }) => {
   const isDispatch = action === 'dispatch';
   const netOut = (entry.totalDispatched || 0) - (entry.totalReturned || 0);
   const max = isDispatch ? entry.availableStock : netOut;
 
-  const [form, setForm] = useState({ date: today(), quantity: '', jobNumber: '', remark: '' });
+  const [form, setForm] = useState({ date: today(), quantity: '', jobNumber: '', location: entry.storageLocation || '', remark: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Ensure the current storage location is always an option
+  const locationOptions = [...new Set([entry.storageLocation, ...locations].filter(Boolean))];
 
   const setField = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -20,6 +23,7 @@ const PurchaseActionModal = ({ action = 'dispatch', entry, onClose, onSubmit }) 
     const qty = Number(form.quantity);
     if (!qty || qty <= 0) { setError('Enter a quantity greater than 0'); return; }
     if (qty > max) { setError(`Only ${max} unit(s) available`); return; }
+    if (!form.location.trim()) { setError('Location is required'); return; }
 
     let payload;
     if (isDispatch) {
@@ -28,10 +32,11 @@ const PurchaseActionModal = ({ action = 'dispatch', entry, onClose, onSubmit }) 
         dispatchDate: form.date,
         quantity: qty,
         jobNumber: form.jobNumber.trim(),
+        location: form.location.trim(),
         remark: form.remark.trim(),
       };
     } else {
-      payload = { returnDate: form.date, quantity: qty };
+      payload = { returnDate: form.date, quantity: qty, location: form.location.trim() };
     }
 
     setSubmitting(true);
@@ -72,6 +77,14 @@ const PurchaseActionModal = ({ action = 'dispatch', entry, onClose, onSubmit }) 
             <div>
               <label className={label}>Quantity <span className="text-red-500">*</span></label>
               <input type="number" min="0" step="any" max={max} value={form.quantity} onChange={(e) => setField('quantity', e.target.value)} className={inputCls} placeholder="0" />
+            </div>
+
+            <div className="col-span-2">
+              <label className={label}>Location <span className="text-red-500">*</span></label>
+              <select value={form.location} onChange={(e) => setField('location', e.target.value)} className={inputCls}>
+                <option value="">Select a location</option>
+                {locationOptions.map((l) => <option key={l} value={l}>{l}</option>)}
+              </select>
             </div>
 
             {isDispatch && (

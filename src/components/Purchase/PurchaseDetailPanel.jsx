@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { stockStatus, formatQuantity, canModifyEntry, isCrmAdmin, createdByLabel } from '../../config/purchase';
+import { stockStatus, formatQuantity, canModifyEntry, isCrmAdmin, createdByLabel, receiptStatusMeta, canReceive, canManageStock } from '../../config/purchase';
 
 const fmtDate = (d) => {
   if (!d) return '—';
@@ -36,22 +36,38 @@ const Stat = ({ label, value, color, bg }) => (
  * stats stay pinned while Details / Dispatch / Returns swap in below, so the
  * whole record is readable with minimal scrolling.
  */
-const PurchaseDetailPanel = ({ entry, currentUser, onClose, onDispatch, onReturn, onEdit, onDelete }) => {
+const ACTION_META = {
+  purchased: { label: 'Purchased', color: 'text-gray-700', dot: 'bg-gray-400' },
+  received: { label: 'Received', color: 'text-green-700', dot: 'bg-green-500' },
+  not_received: { label: 'Not Received', color: 'text-red-700', dot: 'bg-red-500' },
+  dispatch: { label: 'Dispatched', color: 'text-blue-700', dot: 'bg-blue-500' },
+  return: { label: 'Returned', color: 'text-amber-700', dot: 'bg-amber-500' },
+  updated: { label: 'Updated', color: 'text-gray-600', dot: 'bg-gray-300' },
+};
+
+const PurchaseDetailPanel = ({ entry, currentUser, onClose, onReceive, onDispatch, onReturn, onEdit, onDelete }) => {
   const [tab, setTab] = useState('details');
 
   const st = stockStatus(entry.availableStock);
-  const canModify = canModifyEntry(currentUser, entry);
+  const rs = receiptStatusMeta(entry.receiptStatus);
   const admin = isCrmAdmin(currentUser);
+
+  // What this user may do, given the material's lifecycle stage
+  const showReceive = !!onReceive && canReceive(currentUser, entry);
+  const canStock = canManageStock(currentUser, entry); // dispatch / return
+  const canEdit = canModifyEntry(currentUser, entry);   // procurement edit
 
   const dispatches = [...(entry.dispatches || [])].sort((a, b) => new Date(b.dispatchDate) - new Date(a.dispatchDate));
   const returns = [...(entry.returns || [])].sort((a, b) => new Date(b.returnDate) - new Date(a.returnDate));
+  const activity = [...(entry.activity || [])].sort((a, b) => new Date(a.at) - new Date(b.at));
   const jobNumbers = [...new Set(dispatches.map((d) => d.jobNumber).filter(Boolean))];
-  const showActions = onDispatch || onReturn || onEdit || onDelete;
+  const showActions = showReceive || (canStock && (onDispatch || onReturn)) || (canEdit && onEdit) || (admin && onDelete);
 
   const TABS = [
     { key: 'details', label: 'Details' },
     { key: 'dispatch', label: `Dispatch (${dispatches.length})` },
     { key: 'returns', label: `Returns (${returns.length})` },
+    { key: 'activity', label: 'History' },
   ];
 
   return (
@@ -63,8 +79,9 @@ const PurchaseDetailPanel = ({ entry, currentUser, onClose, onDispatch, onReturn
         {/* Header */}
         <div className="px-4 py-3 border-b border-gray-200 flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <h2 className="text-sm font-semibold text-gray-800 truncate">{entry.itemName}</h2>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold flex-shrink-0 ${rs.badge}`}>{rs.label}</span>
               <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold flex-shrink-0 ${st.badge}`}>{st.label}</span>
             </div>
             <p className="text-[11px] text-gray-500 truncate mt-0.5">
@@ -118,6 +135,27 @@ const PurchaseDetailPanel = ({ entry, currentUser, onClose, onDispatch, onReturn
                 <Row label="Job Number(s)" value={jobNumbers.length ? jobNumbers.join(', ') : 'Not dispatched yet'} mono={!!jobNumbers.length} />
               </div>
 
+              {/* Receipt status */}
+              <div className={`rounded-lg p-2.5 border ${entry.receiptStatus === 'received' ? 'bg-green-50 border-green-100' : entry.receiptStatus === 'not_received' ? 'bg-red-50 border-red-100' : 'bg-amber-50 border-amber-100'}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wide text-gray-400">Receipt Status</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${rs.badge}`}>{rs.label}</span>
+                </div>
+                {entry.receiptStatus !== 'pending' && (
+                  <div className="mt-1.5 grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-[10px] text-gray-400">{entry.receiptStatus === 'received' ? 'Received By' : 'Actioned By'}</p>
+                      <p className="text-[11px] text-gray-700">{entry.receivedByName || entry.receivedBy?.name || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-400">Date &amp; Time</p>
+                      <p className="text-[11px] text-gray-700">{fmtDateTime(entry.receivedAt)}</p>
+                    </div>
+                    {entry.receiptNote && <div className="col-span-2"><p className="text-[10px] text-gray-400">Note</p><p className="text-[11px] text-gray-700">{entry.receiptNote}</p></div>}
+                  </div>
+                )}
+              </div>
+
               {entry.remarks && (
                 <div className="bg-gray-50 rounded-lg p-2.5">
                   <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Remarks</p>
@@ -159,6 +197,7 @@ const PurchaseDetailPanel = ({ entry, currentUser, onClose, onDispatch, onReturn
                       <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 text-[10px] font-mono">Job #{d.jobNumber || '—'}</span>
                       <span className="text-sm font-bold text-blue-600 whitespace-nowrap">−{d.quantity}</span>
                     </div>
+                    {d.location && <p className="text-[11px] text-gray-600 mt-1">📍 {d.location}</p>}
                     <div className="mt-1.5 flex items-center justify-between text-[10px] text-gray-400">
                       <span>{fmtDate(d.dispatchDate)}</span>
                       {d.createdByName && <span>by {d.createdByName}</span>}
@@ -177,6 +216,7 @@ const PurchaseDetailPanel = ({ entry, currentUser, onClose, onDispatch, onReturn
                   <div key={i} className="border border-gray-100 rounded-lg p-2.5 flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-xs text-gray-700">{fmtDate(r.returnDate)}</p>
+                      {r.location && <p className="text-[11px] text-gray-600">📍 {r.location}</p>}
                       {r.createdByName && <p className="text-[10px] text-gray-400">by {r.createdByName}</p>}
                     </div>
                     <span className="text-sm font-bold text-amber-600 whitespace-nowrap">+{r.quantity}</span>
@@ -185,25 +225,54 @@ const PurchaseDetailPanel = ({ entry, currentUser, onClose, onDispatch, onReturn
               </div>
             ) : <p className="text-xs text-gray-400 text-center py-6">No returns recorded</p>
           )}
+
+          {tab === 'activity' && (
+            activity.length ? (
+              <ol className="relative border-l border-gray-200 ml-1.5 space-y-3">
+                {activity.map((a, i) => {
+                  const m = ACTION_META[a.action] || ACTION_META.updated;
+                  return (
+                    <li key={i} className="ml-3">
+                      <span className={`absolute -left-[5px] mt-1 h-2.5 w-2.5 rounded-full ${m.dot} ring-2 ring-white`}></span>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className={`text-xs font-semibold ${m.color}`}>{m.label}
+                          {a.quantity != null && <span className="font-normal text-gray-500"> · {a.quantity}{a.jobNumber ? ` · Job #${a.jobNumber}` : ''}</span>}
+                        </p>
+                        <span className="text-[10px] text-gray-400 whitespace-nowrap">{fmtDateTime(a.at)}</span>
+                      </div>
+                      <p className="text-[10px] text-gray-500">{a.byName || '—'}{a.byRole ? ` (${a.byRole.replace('_', ' ')})` : ''}</p>
+                      {a.note && <p className="text-[11px] text-gray-600 mt-0.5">{a.note}</p>}
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : <p className="text-xs text-gray-400 text-center py-6">No activity yet</p>
+          )}
         </div>
 
-        {/* Footer: actions or read-only notice */}
-        {showActions && (
-          canModify ? (
-            <div className="grid grid-cols-2 gap-2 px-4 py-3 border-t border-gray-200 bg-white">
-              {onDispatch && (
+        {/* Footer: lifecycle actions */}
+        {showActions ? (
+          <div className="px-4 py-3 border-t border-gray-200 bg-white space-y-2">
+            {showReceive && (
+              <button onClick={() => onReceive(entry)} className="w-full px-3 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 flex items-center justify-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                Confirm Receipt (Received / Not Received)
+              </button>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              {canStock && onDispatch && (
                 <button onClick={() => onDispatch(entry)} className="px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 flex items-center justify-center gap-1.5">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
                   Dispatch
                 </button>
               )}
-              {onReturn && (
+              {canStock && onReturn && (
                 <button onClick={() => onReturn(entry)} className="px-3 py-2 text-xs font-medium text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 flex items-center justify-center gap-1.5">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
                   Return
                 </button>
               )}
-              {onEdit && (
+              {canEdit && onEdit && (
                 <button onClick={() => onEdit(entry)} className="px-3 py-2 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 flex items-center justify-center gap-1.5">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                   Edit
@@ -216,12 +285,14 @@ const PurchaseDetailPanel = ({ entry, currentUser, onClose, onDispatch, onReturn
                 </button>
               )}
             </div>
-          ) : (
+          </div>
+        ) : (
+          entry.receiptStatus === 'pending' && (
             <div className="px-4 py-2.5 border-t border-gray-200 bg-amber-50 text-amber-800 text-[11px] flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>View only — created by <b>{createdByLabel(entry)}</b></span>
+              <span>Awaiting receipt confirmation by the location manager</span>
             </div>
           )
         )}

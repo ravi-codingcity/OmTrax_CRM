@@ -77,10 +77,11 @@ const PurchaseTable = ({ entries, currentUser, onOpenDetails }) => {
                 const st = stockStatus(e.availableStock);
                 const locked = manage && !canModifyEntry(currentUser, e);
                 const branch = creatorBranch(e);
+                const pending = e.receiptStatus === 'pending';
                 return (
-                  <tr key={e._id} className="even:bg-slate-50/70 hover:bg-emerald-50/50 transition-colors">
+                  <tr key={e._id} className={`hover:bg-emerald-50/50 transition-colors ${pending ? 'bg-amber-50' : 'even:bg-slate-50/70'}`}>
                     {/* User: full name + branch below */}
-                    <td className={cellCls}>
+                    <td className={`${cellCls} ${pending ? 'border-l-4 border-l-amber-400' : ''}`}>
                       <p className="text-xs font-medium text-gray-800 truncate" title={creatorName(e)}>{creatorName(e)}</p>
                       {branch && <p className="text-[10px] text-gray-400 truncate" title={branch}>{branch}</p>}
                     </td>
@@ -117,8 +118,9 @@ const PurchaseTable = ({ entries, currentUser, onOpenDetails }) => {
           const st = stockStatus(e.availableStock);
           const locked = manage && !canModifyEntry(currentUser, e);
           const branch = creatorBranch(e);
+          const pending = e.receiptStatus === 'pending';
           return (
-            <div key={e._id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
+            <div key={e._id} className={`bg-white rounded-xl shadow-sm border p-3 ${pending ? 'border-amber-300 bg-amber-50/40' : 'border-gray-100'}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold text-gray-800 text-sm truncate">{e.itemName}</p>

@@ -81,3 +81,35 @@ export const roleTitle = (role) =>
     branch_manager: 'Branch Manager',
     warehouse_manager: 'Warehouse Manager',
   }[role] || role);
+
+// ---- Location-based receipt workflow ----
+
+export const LOCATION_ROLES = ['warehouse_manager', 'branch_manager'];
+export const isLocationManager = (user) => LOCATION_ROLES.includes(user?.role);
+
+// A location manager owns the storage location whose name matches their branch.
+export const ownsLocation = (user, entry) => {
+  if (!user || !entry) return false;
+  return (user.branch || '').trim().toLowerCase() === (entry.storageLocation || '').trim().toLowerCase();
+};
+
+export const receiptStatusMeta = (status) =>
+  ({
+    received: { label: 'Received', badge: 'bg-green-100 text-green-700', dot: 'bg-green-500' },
+    not_received: { label: 'Not Received', badge: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
+    pending: { label: 'Awaiting Receipt', badge: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' },
+  }[status] || { label: 'Awaiting Receipt', badge: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' });
+
+// Can this user mark a *pending* material received / not received?
+export const canReceive = (user, entry) => {
+  if (!user || !entry || entry.receiptStatus !== 'pending') return false;
+  if (isCrmAdmin(user)) return true;
+  return isLocationManager(user) && ownsLocation(user, entry);
+};
+
+// Can this user record dispatches / returns? Only after the material is received.
+export const canManageStock = (user, entry) => {
+  if (!user || !entry || entry.receiptStatus !== 'received') return false;
+  if (isCrmAdmin(user)) return true;
+  return isLocationManager(user) && ownsLocation(user, entry);
+};

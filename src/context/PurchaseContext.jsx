@@ -144,6 +144,16 @@ export const PurchaseProvider = ({ children }) => {
     }
   }, []);
 
+  const receiveEntry = useCallback(async (id, payload) => {
+    try {
+      const res = await purchaseAPI.receive(id, payload);
+      upsertEntry(res.data.data);
+      return { success: true, data: res.data.data };
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || 'Failed to update receipt status' };
+    }
+  }, []);
+
   const dispatchItem = useCallback(async (id, payload) => {
     try {
       const res = await purchaseAPI.dispatch(id, payload);
@@ -183,6 +193,7 @@ export const PurchaseProvider = ({ children }) => {
         addEntry,
         updateEntry,
         deleteEntry,
+        receiveEntry,
         dispatchItem,
         returnItem,
       }}

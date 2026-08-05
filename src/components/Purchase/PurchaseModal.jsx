@@ -134,13 +134,19 @@ const PurchaseModal = ({ mode = 'add', entry = null, items = [], suppliers = [],
             </div>
             <div>
               <label className={label}>Storage Location</label>
-              <SearchableSelect
+              <select
                 value={form.storageLocation}
-                onChange={(v) => setField('storageLocation', v)}
-                options={locationNames}
-                placeholder="Search or add location"
-              />
-              <p className="text-[10px] text-gray-400 mt-0.5">Where the material is stored. New warehouses/branches are saved automatically.</p>
+                onChange={(e) => setField('storageLocation', e.target.value)}
+                className={inputCls('storageLocation')}
+              >
+                <option value="">Select a location</option>
+                {/* Keep an existing (older, free-typed) value selectable when editing */}
+                {form.storageLocation && !locationNames.includes(form.storageLocation) && (
+                  <option value={form.storageLocation}>{form.storageLocation}</option>
+                )}
+                {locationNames.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
+              </select>
+              <p className="text-[10px] text-gray-400 mt-0.5">Where the material is stored. Choose from the predefined locations.</p>
             </div>
 
             <div>
