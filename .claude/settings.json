@@ -65,7 +65,20 @@
       "Bash(mkdir -p /c/Users/Ravi/AppData/Local/Temp/claude/d--OmTrax-CRM-my-project/9c0c612e-f6a5-4436-8b90-52dc4f640549/scratchpad)",
       "Bash(echo \"=== DNS resolve crmapi.omtraxcrm.in ===\")",
       "Bash(nslookup crmapi.omtraxcrm.in)",
-      "Bash(sed -i 's/api\\\\.omtraxcrm\\\\.in/crmapi.omtraxcrm.in/g' CRM_backend/.htaccess my-project/public/.htaccess)"
+      "Bash(sed -i 's/api\\\\.omtraxcrm\\\\.in/crmapi.omtraxcrm.in/g' CRM_backend/.htaccess my-project/public/.htaccess)",
+      "Bash(sed -n '/exports.getAllUsers/,/^};/p' src/controllers/authController.js)",
+      "Bash(sed -n '/exports.updateUser/,/^};/p' src/controllers/authController.js)",
+      "Bash(cd d:/OmTrax_CRM && echo \"=== User model fields ===\" && sed -n '1,80p' CRM_backend/src/models/User.js | grep -nE \"username|password|name|email|role|department|branch|phoneNumber|isActive|lastLogin|timestamps|matchPassword|pre\\\\\\(\" && echo \"\" && echo \"=== frontend departments config ===\" && cat my-project/src/config/departments.js && echo \"\" && echo \"=== existing admin Users page/nav? ===\" && ls my-project/src/pages/admin/ && grep -rn \"getUsers\\\\|/admin/users\\\\|User Management\\\\|updateUser\" my-project/src/ | grep -v node_modules | head)",
+      "Bash(node -e \"require\\('./src/app'\\); console.log\\('backend loads OK'\\);\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\).on\\('end',\\(\\)=>{JSON.parse\\(d\\).forEach\\(f=>f.messages.forEach\\(m=>console.log\\(f.filePath.replace\\(/.*my-project./,''\\)+':'+m.line+' ['+m.ruleId+'] '+m.message.slice\\(0,70\\)\\)\\)\\)}\\);\")",
+      "Bash(grep -nE \"^#{1,3} \" CRM_backend/README.md)",
+      "Bash(cd d:/OmTrax_CRM && echo \"=== FRONTEND refs \\(signup/reset/accessKey/AuthKey\\) ===\" && grep -rn -iE \"signup|reset-password|resetpassword|accessKey|AuthKeyRoute|authAccessKey|VITE_AUTH_ACCESS_KEY|verifyAccessKey\" my-project/src/ | grep -v node_modules *)",
+      "Bash(cp src/controllers/authController.js \"/c/Users/Ravi/AppData/Local/Temp/claude/d--OmTrax-CRM-my-project/9c0c612e-f6a5-4436-8b90-52dc4f640549/scratchpad/authController.bak.js\")",
+      "Bash(sed -i '258,335d' src/controllers/authController.js)",
+      "Bash(sed -i '40,127d' src/controllers/authController.js)",
+      "Bash(rm -f src/middleware/authAccessKey.js)",
+      "Bash(node -e \"require\\('./src/controllers/authController'\\); require\\('./src/routes/authRoutes'\\); require\\('./src/app'\\); console.log\\('backend loads OK'\\);\")",
+      "Bash(cd d:/OmTrax_CRM && grep -rn -iE \"signup|reset.password|access.key|URL-key|url-based auth\" CRM_backend/README.md my-project/README.md | head)"
     ],
     "additionalDirectories": [
       "d:\\OmTrax_CRM\\CRM_backend\\src\\utils",

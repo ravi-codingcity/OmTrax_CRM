@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Backend API base. The API is hosted on the crmapi subdomain.
-const API_BASE_URL = 'https://crmapi.omtraxcrm.in/api';
+const API_BASE_URL = 'https://crm.omtraxcrm.in/api';
 
 // Create axios instance
 const api = axios.create({
@@ -52,23 +52,17 @@ api.interceptors.response.use(
 );
 
 // ==================== AUTH APIs ====================
-// Sign Up / Reset Password are URL-authenticated. The key is taken from the page
-// URL and forwarded here — deliberately NOT stored in an env var, because Vite
-// inlines those into the public bundle where anyone could read it. The server
-// verifies the key and answers 404 when it is wrong.
-const authKeyHeader = (accessKey) => ({
-  headers: { 'x-auth-access-key': accessKey || '' },
-});
-
+// Account creation and password resets are admin-only (User Management panel).
+// There is no public signup / self-service reset flow.
 export const authAPI = {
-  signup: (data, accessKey) => api.post('/auth/signup', data, authKeyHeader(accessKey)),
   login: (data) => api.post('/auth/login', data),
   getMe: () => api.get('/auth/me'),
   updatePassword: (data) => api.put('/auth/update-password', data),
-  resetPassword: (data, accessKey) => api.post('/auth/reset-password', data, authKeyHeader(accessKey)),
-  verifyAccessKey: (accessKey) => api.get('/auth/access-check', authKeyHeader(accessKey)),
-  getUsers: () => api.get('/auth/users'),
+  getUsers: (params = {}) => api.get('/auth/users', { params }),
+  createUser: (data) => api.post('/auth/users', data),
   updateUser: (id, data) => api.put(`/auth/users/${id}`, data),
+  resetUserPassword: (id, newPassword) => api.put(`/auth/users/${id}/password`, { newPassword }),
+  deleteUser: (id) => api.delete(`/auth/users/${id}`),
 };
 
 // ==================== SALES APIs ====================

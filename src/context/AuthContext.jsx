@@ -75,13 +75,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const getUsers = async () => {
+  const getUsers = async (params = {}) => {
     try {
-      const response = await authAPI.getUsers();
+      const response = await authAPI.getUsers(params);
       return response.data.data || response.data;
     } catch (error) {
       console.error('Failed to fetch users:', error);
       return [];
+    }
+  };
+
+  const createUser = async (data) => {
+    try {
+      const response = await authAPI.createUser(data);
+      return { success: true, data: response.data.data || response.data };
+    } catch (error) {
+      const message = error.response?.data?.message ||
+        error.response?.data?.errors?.[0]?.msg || 'Failed to create user';
+      return { success: false, message };
     }
   };
 
@@ -91,6 +102,26 @@ export const AuthProvider = ({ children }) => {
       return { success: true, data: response.data.data || response.data };
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to update user';
+      return { success: false, message };
+    }
+  };
+
+  const resetUserPassword = async (id, newPassword) => {
+    try {
+      await authAPI.resetUserPassword(id, newPassword);
+      return { success: true };
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to reset password';
+      return { success: false, message };
+    }
+  };
+
+  const deleteUser = async (id) => {
+    try {
+      await authAPI.deleteUser(id);
+      return { success: true };
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to delete user';
       return { success: false, message };
     }
   };
@@ -112,10 +143,13 @@ export const AuthProvider = ({ children }) => {
       login, 
       logout, 
       isAdmin, 
-      updatePassword, 
-      getUsers, 
+      updatePassword,
+      getUsers,
+      createUser,
       updateUser,
-      loading 
+      resetUserPassword,
+      deleteUser,
+      loading
     }}>
       {children}
     </AuthContext.Provider>
