@@ -8,7 +8,7 @@ export const RECRUITERS = ['Ridhi', 'Priya', 'Rishita'];
 export const SALES_PERSONS = ['Varun', 'Nimit', 'Anchal'];
 
 // Role helpers
-export const isHrAdmin = (user) => user?.role === 'admin';
+export const isHrAdmin = (user) => ['admin', 'director'].includes(user?.role);
 export const isTeamLeader = (user) => user?.role === 'team_leader';
 export const isRecruiter = (user) => user?.role === 'recruiter';
 export const canManageHr = (user) => isHrAdmin(user) || isTeamLeader(user);
@@ -35,4 +35,4 @@ export const feedbackTextColor = (value) =>
   }[value] || 'text-gray-500');
 
 export const roleLabel = (role) =>
-  ({ admin: 'HR Admin', team_leader: 'HR Team Leader', recruiter: 'Recruiter' }[role] || role);
+  ({ admin: 'HR Admin', director: 'Director', team_leader: 'HR Team Leader', recruiter: 'Recruiter' }[role] || role);

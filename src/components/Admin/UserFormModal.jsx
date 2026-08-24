@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { DEPARTMENTS, ROLES_BY_DEPARTMENT, DEFAULT_DEPARTMENT } from '../../config/departments';
+import { DEPARTMENTS, ROLES_BY_DEPARTMENT, DEFAULT_DEPARTMENT, CROSS_DEPARTMENT_ROLES } from '../../config/departments';
 
 const BRANCHES = ['Delhi', 'Mumbai', 'Bangalore', 'Chennai', 'Hyderabad', 'Kolkata', 'Pune', 'Gurugram', 'Ahmedabad'];
 
-// Role choices for a department. Admin is cross-department, so always offer it.
+// Role choices for a department. Admin and Director are cross-department, so
+// they are always offered whichever department is selected.
 const roleOptionsFor = (deptKey) => {
-  const base = ROLES_BY_DEPARTMENT[deptKey] || [];
-  return base.some((r) => r.value === 'admin') ? base : [...base, { value: 'admin', label: 'Admin' }];
+  const base = (ROLES_BY_DEPARTMENT[deptKey] || []).filter(
+    (r) => !CROSS_DEPARTMENT_ROLES.some((c) => c.value === r.value)
+  );
+  return [...base, ...CROSS_DEPARTMENT_ROLES];
 };
 
 const emptyForm = {

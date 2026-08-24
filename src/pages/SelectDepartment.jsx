@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useDepartment } from '../context/DepartmentContext';
-import { DEPARTMENTS } from '../config/departments';
+import { departmentsForUser } from '../config/departments';
 import omtrax_logo from '../assets/OmTrax.png';
 
 const colorClasses = {
@@ -20,6 +20,16 @@ const colorClasses = {
     ring: 'hover:border-emerald-500 hover:shadow-emerald-100',
     icon: 'bg-emerald-100 text-emerald-600',
     btn: 'bg-emerald-600 hover:bg-emerald-700',
+  },
+  amber: {
+    ring: 'hover:border-amber-500 hover:shadow-amber-100',
+    icon: 'bg-amber-100 text-amber-600',
+    btn: 'bg-amber-600 hover:bg-amber-700',
+  },
+  slate: {
+    ring: 'hover:border-slate-500 hover:shadow-slate-100',
+    icon: 'bg-slate-100 text-slate-600',
+    btn: 'bg-slate-700 hover:bg-slate-800',
   },
 };
 
@@ -39,7 +49,12 @@ const SelectDepartment = () => {
 
   const handleSelect = (deptKey) => {
     setActiveDepartment(deptKey);
-    const home = { hr: '/hr/dashboard', purchase: '/purchase/dashboard' }[deptKey] || '/admin/dashboard';
+    const home = {
+      director: '/director/dashboard',
+      hr: '/hr/dashboard',
+      purchase: '/purchase/dashboard',
+      finance: '/finance/dashboard',
+    }[deptKey] || '/admin/dashboard';
     navigate(home, { replace: true });
   };
 
@@ -60,7 +75,7 @@ const SelectDepartment = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {DEPARTMENTS.map((dept) => {
+          {departmentsForUser(user).map((dept) => {
             const c = colorClasses[dept.color] || colorClasses.blue;
             return (
               <button

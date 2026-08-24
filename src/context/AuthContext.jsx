@@ -63,7 +63,13 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('omtrax_department');
   };
 
-  const isAdmin = () => user?.role === 'admin';
+  // Admin and Director carry identical CRM authority, so isAdmin() answers yes
+  // for both. Every screen that gates on isAdmin() therefore treats a Director
+  // exactly like an Admin — which is the intent. isDirector() exists for the few
+  // places that need to name the role rather than the authority.
+  const ADMIN_LEVEL_ROLES = ['admin', 'director'];
+  const isAdmin = () => ADMIN_LEVEL_ROLES.includes(user?.role);
+  const isDirector = () => user?.role === 'director';
 
   const updatePassword = async (currentPassword, newPassword) => {
     try {
@@ -142,7 +148,8 @@ export const AuthProvider = ({ children }) => {
       user, 
       login, 
       logout, 
-      isAdmin, 
+      isAdmin,
+      isDirector,
       updatePassword,
       getUsers,
       createUser,

@@ -124,8 +124,8 @@ const UserManagement = () => {
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-800">User Management</h1>
-              <p className="text-gray-500 text-xs sm:text-sm mt-1">Create, edit, reset passwords and manage all CRM accounts</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Users</h1>
+              <p className="text-gray-500 text-xs sm:text-sm mt-1">Every account across all departments. Admin and Director only.</p>
             </div>
             <button
               onClick={() => setFormModal({ mode: 'create', user: null })}
@@ -195,6 +195,7 @@ const UserManagement = () => {
                   <tr>
                     <th className={th}>User</th>
                     <th className={th}>Email</th>
+                    <th className={th}>Phone</th>
                     <th className={th}>Role</th>
                     <th className={th}>Department</th>
                     <th className={th}>Branch</th>
@@ -214,6 +215,7 @@ const UserManagement = () => {
                           <p className="text-[11px] text-gray-500">@{u.username}</p>
                         </td>
                         <td className={`${td} text-gray-600`}>{u.email || '—'}</td>
+                        <td className={`${td} text-gray-600 whitespace-nowrap`}>{u.phoneNumber || '—'}</td>
                         <td className={td}><span className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium ${roleBadge(u.role)}`}>{getRoleLabel(u.role)}</span></td>
                         <td className={td}><span className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium ${deptBadge(u.department)}`}>{getDepartmentLabel(u.department)}</span></td>
                         <td className={`${td} text-gray-600`}>{u.branch || '—'}</td>

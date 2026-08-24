@@ -23,6 +23,22 @@ export const DEPARTMENTS = [
     color: 'emerald',
     icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
   },
+  {
+    key: 'director',
+    label: 'Director',
+    description: 'Approve rate comparisons & review purchase orders',
+    color: 'slate',
+    icon: 'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z',
+    // Only administrators may enter this section
+    restrictedToRoles: ['admin', 'director'],
+  },
+  {
+    key: 'finance',
+    label: 'Finance',
+    description: 'Vendor KYC verification & approvals',
+    color: 'amber',
+    icon: 'M9 7h6m-6 4h6m-6 4h4M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z',
+  },
 ];
 
 export const DEFAULT_DEPARTMENT = 'relocation';
@@ -43,16 +59,42 @@ export const ROLES_BY_DEPARTMENT = {
     { value: 'branch_manager', label: 'Branch Manager' },
     { value: 'warehouse_manager', label: 'Warehouse Manager' },
   ],
+  finance: [
+    { value: 'finance_manager', label: 'Finance Manager' },
+    { value: 'accounts_executive', label: 'Accounts Executive' },
+  ],
+  // No dedicated roles — only the cross-department Admin and Director may enter
+  director: [],
 };
 
 // Roles that can view all entries within their department (vs. only their own)
+// Cross-department roles — offered whichever department is selected.
+// Director carries the same authority as Admin.
+export const CROSS_DEPARTMENT_ROLES = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'director', label: 'Director' },
+];
+
+export const ADMIN_LEVEL_ROLES = ['admin', 'director'];
+export const isAdminLevel = (user) => ADMIN_LEVEL_ROLES.includes(user?.role);
+
 export const FULL_ACCESS_ROLES = [
-  'admin', 'manager', 'hr_manager', 'hr_head',
+  'admin', 'director', 'manager', 'hr_manager', 'hr_head',
   'purchase_manager', 'branch_manager', 'warehouse_manager',
+  'finance_manager', 'accounts_executive',
 ];
 
 export const getDepartment = (key) =>
   DEPARTMENTS.find((d) => d.key === key) || DEPARTMENTS[0];
+
+// Departments this user may open. A department with `restrictedToRoles` is
+// hidden from everyone else — the Director section is not offered to Sales, HR,
+// Purchase or Finance users.
+export const departmentsForUser = (user) =>
+  DEPARTMENTS.filter((d) => !d.restrictedToRoles || d.restrictedToRoles.includes(user?.role));
+
+export const canOpenDepartment = (user, key) =>
+  departmentsForUser(user).some((d) => d.key === key);
 
 export const getDepartmentLabel = (key) => getDepartment(key).label;
 
@@ -60,6 +102,8 @@ export const canViewAllInDepartment = (role) => FULL_ACCESS_ROLES.includes(role)
 
 // Human-readable role label across all departments
 export const getRoleLabel = (role) => {
+  const cross = CROSS_DEPARTMENT_ROLES.find((r) => r.value === role);
+  if (cross) return cross.label;
   for (const list of Object.values(ROLES_BY_DEPARTMENT)) {
     const match = list.find((r) => r.value === role);
     if (match) return match.label;

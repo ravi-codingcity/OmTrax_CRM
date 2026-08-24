@@ -1,7 +1,11 @@
 import axios from 'axios';
 
-// Backend API base. The API is hosted on the crmapi subdomain.
-const API_BASE_URL = 'https://crm.omtraxcrm.in/api';
+// Backend API base.
+// --- DEVELOPMENT (active) --- local Express server, PORT=5000 in CRM Backend/.env
+// const API_BASE_URL = 'http://localhost:5000/api';
+
+// --- PRODUCTION (restore before building for deploy) ---
+ const API_BASE_URL = 'https://crm.omtraxcrm.in/api';
 
 // Create axios instance
 const api = axios.create({
@@ -153,6 +157,90 @@ export const dashboardAPI = {
   getAnalytics: (params = {}) => api.get('/dashboard/analytics', { params }),
   getActivities: () => api.get('/dashboard/activities'),
   getSalespersonPerformance: () => api.get('/dashboard/salesperson-performance'),
+};
+
+// ==================== VENDOR APIs ====================
+// Vendors are shared between the Purchase and Finance departments — the backend
+// deliberately does not department-scope them.
+export const vendorAPI = {
+  getAll: (params = {}) => api.get('/vendors', { params }),
+  getStats: () => api.get('/vendors/stats'),
+  getById: (id) => api.get(`/vendors/${id}`),
+  create: (data) => api.post('/vendors', data),
+  // Generate a KYC link without filling in the Add Vendor form — the vendor
+  // supplies their own details. Independent of create() above.
+  createKycRequest: (data) => api.post('/vendors/kyc-request', data),
+  update: (id, data) => api.put(`/vendors/${id}`, data),
+  delete: (id) => api.delete(`/vendors/${id}`),
+  // KYC link management (Purchase Manager, Finance, Admin)
+  generateKycLink: (id, data = {}) => api.post(`/vendors/${id}/kyc-link`, data),
+  markKycLinkSent: (id, data = {}) => api.post(`/vendors/${id}/kyc-link/sent`, data),
+  // KYC review — the backend rejects non-Finance callers with 403
+  startKycReview: (id) => api.post(`/vendors/${id}/kyc/review`),
+  decideKyc: (id, data) => api.post(`/vendors/${id}/kyc/decision`, data),
+  // KYC documents. Cloudinary assets are authenticated, so the backend issues
+  // short-lived signed view/download URLs after checking permissions.
+  getDocuments: (id) => api.get(`/vendors/${id}/documents`),
+  documentUrl: (id, docId, download = false) =>
+    api.get(`/vendors/${id}/documents/${docId}`, { params: { download, format: 'json' } }),
+};
+
+// ==================== PURCHASE ORDER APIs ====================
+export const purchaseOrderAPI = {
+  getAll: (params = {}) => api.get('/purchase-orders', { params }),
+  getStats: () => api.get('/purchase-orders/stats'),
+  // Terms used on previous POs, offered as suggestions on the next one
+  getTermsSuggestions: () => api.get('/purchase-orders/terms-suggestions'),
+  getById: (id) => api.get(`/purchase-orders/${id}`),
+  create: (data) => api.post('/purchase-orders', data),
+  update: (id, data) => api.put(`/purchase-orders/${id}`, data),
+  setStatus: (id, data) => api.post(`/purchase-orders/${id}/status`, data),
+  delete: (id) => api.delete(`/purchase-orders/${id}`),
+};
+
+// ==================== RATE COMPARISON APIs ====================
+// The approval step that precedes a Purchase Order. Decisions are Director /
+// Admin only — the backend rejects anyone else with 403.
+export const rateComparisonAPI = {
+  getAll: (params = {}) => api.get('/rate-comparisons', { params }),
+  getStats: () => api.get('/rate-comparisons/stats'),
+  getById: (id) => api.get(`/rate-comparisons/${id}`),
+  create: (data) => api.post('/rate-comparisons', data),
+  update: (id, data) => api.put(`/rate-comparisons/${id}`, data),
+  submit: (id) => api.post(`/rate-comparisons/${id}/submit`),
+  decide: (id, data) => api.post(`/rate-comparisons/${id}/decision`, data),
+  delete: (id) => api.delete(`/rate-comparisons/${id}`),
+};
+
+// ==================== PUBLIC KYC FORM ====================
+// The vendor filling this in has no CRM account, so these calls must NOT carry
+// the auth token or the department param. A bare axios instance is used so the
+// interceptors above never touch them.
+const publicApi = axios.create({ baseURL: API_BASE_URL });
+
+// A submission carries up to five 1 MB documents. Without a ceiling a stalled
+// connection leaves the vendor's form spinning forever with no way to retry,
+// which is exactly the "stuck on submitting" symptom.
+const KYC_SUBMIT_TIMEOUT_MS = 120000; // 2 minutes
+const KYC_LOAD_TIMEOUT_MS = 20000;
+
+export const kycAPI = {
+  getForm: (token) => publicApi.get(`/kyc/${token}`, { timeout: KYC_LOAD_TIMEOUT_MS }),
+  /**
+   * @param onProgress optional (percent:number) => void, driven by the browser's
+   *                   real upload progress so the vendor sees movement
+   */
+  submit: (token, formData, onProgress) =>
+    publicApi.post(`/kyc/${token}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: KYC_SUBMIT_TIMEOUT_MS,
+      onUploadProgress: onProgress
+        ? (e) => {
+            if (!e.total) return;
+            onProgress(Math.min(100, Math.round((e.loaded * 100) / e.total)));
+          }
+        : undefined,
+    }),
 };
 
 // ==================== BRANCH APIs ====================

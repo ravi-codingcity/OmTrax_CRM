@@ -58,7 +58,7 @@ export const PURCHASE_ROLES = ['purchase_manager', 'branch_manager', 'warehouse_
 
 export const isPurchaseManager = (user) => user?.role === 'purchase_manager';
 export const isPurchaseStaff = (user) => PURCHASE_ROLES.includes(user?.role);
-export const isCrmAdmin = (user) => user?.role === 'admin';
+export const isCrmAdmin = (user) => ['admin', 'director'].includes(user?.role);
 // Purchase staff can create entries; only the CRM Admin can delete.
 export const canManagePurchase = (user) => isPurchaseStaff(user) || isCrmAdmin(user);
 
@@ -77,6 +77,7 @@ export const canModifyEntry = (user, entry) => {
 export const roleTitle = (role) =>
   ({
     admin: 'CRM Admin',
+    director: 'Director',
     purchase_manager: 'Purchase Manager',
     branch_manager: 'Branch Manager',
     warehouse_manager: 'Warehouse Manager',

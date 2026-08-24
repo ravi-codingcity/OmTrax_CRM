@@ -9,6 +9,7 @@ import PurchaseTable from '../../components/Purchase/PurchaseTable';
 import PurchaseDetailPanel from '../../components/Purchase/PurchaseDetailPanel';
 import ExportModal from '../../components/Purchase/ExportModal';
 import ReceiveModal from '../../components/Purchase/ReceiveModal';
+import VendorKycSummary from '../../components/Vendor/VendorKycSummary';
 import { stockStatus, roleTitle, canReceive, formatQuantity } from '../../config/purchase';
 import { getExportRange, exportPurchaseExcel } from '../../utils/purchaseExport';
 
@@ -192,6 +193,10 @@ const PurchaseDashboard = () => {
               )}
             </div>
           )}
+
+          {/* Vendor KYC snapshot — pending entries are highlighted so the
+              Purchase Manager can see who is waiting on Finance approval. */}
+          <VendorKycSummary />
 
           {/* Inventory summary */}
           <CollapsibleSection title="Inventory Summary" badge={inventory.length}>

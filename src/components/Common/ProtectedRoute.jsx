@@ -8,7 +8,12 @@ const ProtectedRoute = ({ children, requiredRole, requiredDepartment, allowWitho
 
   // Home path for a non-admin user based on their department
   const homePath = () =>
-    ({ hr: '/hr/dashboard', purchase: '/purchase/dashboard' }[activeDepartment] || '/sales/new-entry');
+    ({
+      hr: '/hr/dashboard',
+      purchase: '/purchase/dashboard',
+      finance: '/finance/dashboard',
+      director: '/director/dashboard',
+    }[activeDepartment] || '/sales/new-entry');
 
   // Show loading state while checking authentication
   if (loading) {

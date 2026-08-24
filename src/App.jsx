@@ -6,6 +6,9 @@ import { NotificationProvider } from './context/NotificationContext';
 import { BusinessProvider } from './context/BusinessContext';
 import { RecruitmentProvider } from './context/RecruitmentContext';
 import { PurchaseProvider } from './context/PurchaseContext';
+import { VendorProvider } from './context/VendorContext';
+import { PurchaseOrderProvider } from './context/PurchaseOrderContext';
+import { RateComparisonProvider } from './context/RateComparisonContext';
 import ProtectedRoute from './components/Common/ProtectedRoute';
 import Login from './pages/Login';
 import SelectDepartment from './pages/SelectDepartment';
@@ -18,7 +21,7 @@ import NewEntry from './pages/sales/NewEntry';
 import MyEntries from './pages/sales/MyEntries';
 import SalesAnalytics from './pages/sales/SalesAnalytics';
 import BusinessOverview from './pages/admin/BusinessOverview';
-import UserManagement from './pages/admin/UserManagement';
+import UserManagement from './pages/director/UserManagement';
 import MyBusiness from './pages/sales/MyBusiness';
 import MyHrRequirements from './pages/sales/MyHrRequirements';
 import HrDashboard from './pages/hr/HrDashboard';
@@ -27,6 +30,12 @@ import HrAnalytics from './pages/hr/HrAnalytics';
 import PurchaseDashboard from './pages/Purchase/PurchaseDashboard';
 import PurchaseEntries from './pages/Purchase/PurchaseEntries';
 import PurchaseAnalytics from './pages/Purchase/PurchaseAnalytics';
+import PurchaseOrders from './pages/Purchase/PurchaseOrders';
+import RateComparisons from './pages/Purchase/RateComparisons';
+import VendorsPage from './pages/shared/VendorsPage';
+import FinanceDashboard from './pages/finance/FinanceDashboard';
+import DirectorDashboard from './pages/director/DirectorDashboard';
+import KycForm from './pages/KycForm';
 
 function App() {
   return (
@@ -37,11 +46,19 @@ function App() {
           <BusinessProvider>
           <RecruitmentProvider>
           <PurchaseProvider>
+          <VendorProvider>
+          <PurchaseOrderProvider>
+          <RateComparisonProvider>
           <Router>
             <Routes>
               {/* Public Routes — login only. Accounts and password resets are
                   managed by admins in the User Management panel. */}
               <Route path="/login" element={<Login />} />
+
+              {/* PUBLIC — Vendor KYC form. The vendor has no CRM account; the
+                  one-time token in the URL is the credential. Deliberately
+                  outside ProtectedRoute and MainLayout. */}
+              <Route path="/kyc/:token" element={<KycForm />} />
 
               {/* Department selection (admin) */}
               <Route
@@ -99,14 +116,6 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole="admin">
                     <BusinessOverview />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/users"
-                element={
-                  <ProtectedRoute requiredRole="admin" allowWithoutDepartment>
-                    <UserManagement />
                   </ProtectedRoute>
                 }
               />
@@ -204,6 +213,87 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/purchase/orders"
+                element={
+                  <ProtectedRoute requiredDepartment="purchase">
+                    <PurchaseOrders />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/purchase/vendors"
+                element={
+                  <ProtectedRoute requiredDepartment="purchase">
+                    <VendorsPage department="purchase" />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/purchase/rate-comparisons"
+                element={
+                  <ProtectedRoute requiredDepartment="purchase">
+                    <RateComparisons />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Finance Routes — Finance department users + CRM Admin */}
+              <Route
+                path="/finance/dashboard"
+                element={
+                  <ProtectedRoute requiredDepartment="finance">
+                    <FinanceDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/finance/vendors"
+                element={
+                  <ProtectedRoute requiredDepartment="finance">
+                    <VendorsPage department="finance" />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Director Department — visible only to Admin and Director.
+                  ProtectedRoute's requiredRole="admin" resolves true for both,
+                  since they share the same CRM authority. */}
+              <Route
+                path="/director/dashboard"
+                element={
+                  <ProtectedRoute requiredRole="admin" requiredDepartment="director">
+                    <DirectorDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/director/rate-comparisons"
+                element={
+                  <ProtectedRoute requiredRole="admin" requiredDepartment="director">
+                    <RateComparisons />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/director/orders"
+                element={
+                  <ProtectedRoute requiredRole="admin" requiredDepartment="director">
+                    <PurchaseOrders />
+                  </ProtectedRoute>
+                }
+              />
+              {/* The single, centralised Users section. requiredRole="admin"
+                  resolves true for Admin and Director alike; every other role is
+                  redirected, and the API refuses them independently. */}
+              <Route
+                path="/director/users"
+                element={
+                  <ProtectedRoute requiredRole="admin" requiredDepartment="director">
+                    <UserManagement />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Redirect root to login */}
               <Route path="/" element={<Navigate to="/login" replace />} />
@@ -212,6 +302,9 @@ function App() {
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           </Router>
+          </RateComparisonProvider>
+          </PurchaseOrderProvider>
+          </VendorProvider>
           </PurchaseProvider>
           </RecruitmentProvider>
           </BusinessProvider>

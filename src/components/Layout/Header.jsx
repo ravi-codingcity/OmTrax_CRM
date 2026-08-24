@@ -254,6 +254,62 @@ const Header = () => {
       );
     }
 
+    // Vendor KYC workflow (Purchase <-> Finance)
+    if (notification.type?.startsWith('vendor_kyc_')) {
+      const meta = {
+        vendor_kyc_submitted: { label: '📄 KYC Submitted', color: 'text-amber-600' },
+        vendor_kyc_approved: { label: '✅ Vendor KYC Approved', color: 'text-green-600' },
+        vendor_kyc_rejected: { label: '❌ Vendor KYC Rejected', color: 'text-red-600' },
+        vendor_kyc_link_sent: { label: '🔗 KYC Link Shared', color: 'text-indigo-600' },
+      }[notification.type] || { label: 'Vendor KYC', color: 'text-gray-600' };
+      return (
+        <>
+          <p className="text-sm text-gray-800">
+            <span className={`font-semibold ${meta.color}`}>{meta.label}</span>
+          </p>
+          <p className="text-xs text-gray-500 mt-1 truncate">{notification.companyName}</p>
+          {notification.remark && <p className="text-xs text-gray-500 mt-0.5 truncate">{notification.remark}</p>}
+        </>
+      );
+    }
+
+    // Rate Comparison approval workflow (Purchase <-> Director)
+    if (notification.type?.startsWith('rate_comparison_')) {
+      const meta = {
+        rate_comparison_submitted: { label: '📊 Rate Comparison Awaiting Approval', color: 'text-amber-600' },
+        rate_comparison_approved: { label: '✅ Rate Comparison Approved', color: 'text-green-600' },
+        rate_comparison_rejected: { label: '❌ Rate Comparison Rejected', color: 'text-red-600' },
+        rate_comparison_sent_back: { label: '↩️ Rate Comparison Sent Back', color: 'text-orange-600' },
+      }[notification.type] || { label: 'Rate Comparison', color: 'text-gray-600' };
+      return (
+        <>
+          <p className="text-sm text-gray-800">
+            <span className={`font-semibold ${meta.color}`}>{meta.label}</span>
+          </p>
+          <p className="text-xs text-gray-500 mt-1 truncate">{notification.companyName}</p>
+          {notification.remark && <p className="text-xs text-gray-500 mt-0.5 truncate">{notification.remark}</p>}
+        </>
+      );
+    }
+
+    // Purchase Order notifications
+    if (notification.type?.startsWith('po_')) {
+      const isSent = notification.type === 'po_sent';
+      return (
+        <>
+          <p className="text-sm text-gray-800">
+            <span className="font-semibold text-emerald-600">
+              {isSent ? '📤 PO Sent' : '🧾 PO Created'}
+            </span>
+            <span className="text-gray-600"> by </span>
+            <span className="font-medium">{getSalesPersonName()}</span>
+          </p>
+          <p className="text-xs text-gray-500 mt-1 truncate">{notification.companyName}</p>
+          {notification.remark && <p className="text-xs text-gray-500 mt-0.5 truncate">{notification.remark}</p>}
+        </>
+      );
+    }
+
     // Purchase location-tracking notifications
     if (notification.type?.startsWith('purchase_')) {
       const meta = {
@@ -315,7 +371,6 @@ const Header = () => {
     { to: '/admin/sales', label: 'All Sales', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
     { to: '/admin/business', label: 'Business', icon: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
     { to: '/admin/assign-leads', label: 'Assign Leads', icon: 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4' },
-    { to: '/admin/users', label: 'Users', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
     { to: '/admin/analytics', label: 'Analytics', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
   ];
 
@@ -341,7 +396,26 @@ const Header = () => {
   const purchaseLinks = [
     { to: '/purchase/dashboard', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
     { to: '/purchase/entries', label: 'Purchases', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+    { to: '/purchase/rate-comparisons', label: 'Rate Comparison', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+    { to: '/purchase/orders', label: 'Purchase Orders', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+    { to: '/purchase/vendors', label: 'Vendors', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
     { to: '/purchase/analytics', label: 'Analytics', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+  ];
+
+  // Finance navigation — vendor KYC review is the core workflow
+  const financeLinks = [
+    { to: '/finance/dashboard', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+    { to: '/finance/vendors', label: 'Vendors', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+  ];
+
+  // Director Department — approvals and purchase-order oversight.
+  // Only reachable by Admin and Director; the department itself is hidden from
+  // every other role in SelectDepartment.
+  const directorLinks = [
+    { to: '/director/dashboard', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+    { to: '/director/rate-comparisons', label: 'Rate Comparisons', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+    { to: '/director/orders', label: 'Purchase Orders', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+    { to: '/director/users', label: 'Users', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
   ];
 
   // Sandboxed sub-user: Business is the only thing they can see or do.
@@ -353,9 +427,11 @@ const Header = () => {
   if (user?.role === 'business_sub') links = businessOnlyLinks;
   else if (activeDepartment === 'hr') links = hrLinks;
   else if (activeDepartment === 'purchase') links = purchaseLinks;
+  else if (activeDepartment === 'finance') links = financeLinks;
+  else if (activeDepartment === 'director') links = directorLinks;
   else links = isAdmin() ? adminLinks : salesLinks;
   // Secondary/occasional items are kept off the compact mobile bottom bar
-  const mobileHiddenLabels = ['Analytics', 'Assign Leads', 'HR Leads', 'Users'];
+  const mobileHiddenLabels = ['Analytics', 'Assign Leads', 'HR Leads', 'Users', 'Rate Comparison'];
 
   return (
     <>
@@ -509,7 +585,7 @@ const Header = () => {
               <div className="text-left hidden lg:block max-w-[120px]">
                 <p className="text-[13px] font-medium text-gray-800 leading-tight truncate">{user?.name}</p>
                 <p className="text-[11px] text-gray-500 leading-tight truncate">
-                  {isAdmin() ? 'Admin' : user?.branch}
+                  {isAdmin() ? (user?.role === 'director' ? 'Director' : 'Admin') : user?.branch}
                 </p>
               </div>
             </div>

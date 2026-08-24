@@ -23,6 +23,10 @@ const Login = () => {
         navigate('/hr/dashboard', { replace: true });
       } else if (user.department === 'purchase') {
         navigate('/purchase/dashboard', { replace: true });
+      } else if (user.department === 'finance') {
+        navigate('/finance/dashboard', { replace: true });
+      } else if (user.department === 'director') {
+        navigate('/director/dashboard', { replace: true });
       } else {
         navigate('/sales/new-entry', { replace: true });
       }
@@ -46,6 +50,10 @@ const Login = () => {
           navigate('/hr/dashboard', { replace: true });
         } else if (result.user.department === 'purchase') {
           navigate('/purchase/dashboard', { replace: true });
+        } else if (result.user.department === 'finance') {
+          navigate('/finance/dashboard', { replace: true });
+        } else if (result.user.department === 'director') {
+          navigate('/director/dashboard', { replace: true });
         } else {
           navigate('/sales/new-entry', { replace: true });
         }
