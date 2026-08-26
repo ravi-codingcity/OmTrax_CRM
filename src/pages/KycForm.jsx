@@ -5,7 +5,7 @@ import MaterialServiceSelector from '../components/Kyc/MaterialServiceSelector';
 import KycDocumentUpload from '../components/Kyc/KycDocumentUpload';
 import {
   KYC_DOCUMENT_FIELDS, MAX_FILE_MB, ALLOWED_LABEL,
-  URP_VALUE, isUrp, isValidGst, visibleDocuments, OTHER_SERVICES,
+  URP_VALUE, isUrp, isValidGst, documentsFor, OTHER_SERVICES,
 } from '../config/kyc';
 import omtrax_logo from '../assets/OmTrax.png';
 
@@ -168,11 +168,13 @@ const KycForm = () => {
 
   const hasFileErrors = useMemo(() => Object.keys(fileErrors).length > 0, [fileErrors]);
 
-  // A vendor entering URP is not GST registered, so the GST certificate slot is
-  // hidden and not required. Mirrored by the backend, which drops it too.
+  // A vendor entering URP is not GST registered: the GST certificate slot is
+  // hidden, and the company registration document stays on offer but stops
+  // being mandatory. `required` comes back already resolved, so the asterisks
+  // and the submit check below agree. Mirrored by the backend.
   const unregistered = isUrp(form.gstNumber);
   const shownDocs = useMemo(
-    () => visibleDocuments(docFields, form.gstNumber),
+    () => documentsFor(docFields, form.gstNumber),
     [docFields, form.gstNumber]
   );
   const fileCount = useMemo(() => Object.keys(files).length, [files]);
@@ -395,7 +397,8 @@ const KycForm = () => {
             {unregistered && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-3 text-xs text-blue-800">
                 You selected <strong>{URP_VALUE}</strong> (Unregistered Proprietorship), so the
-                GST Certificate is not needed.
+                GST Certificate is not needed and the Company Registration Document is
+                optional — upload it only if you have one.
               </div>
             )}
             <KycDocumentUpload

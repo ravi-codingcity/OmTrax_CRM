@@ -51,12 +51,14 @@ export const validateKycFile = (file) => {
 // --- Documents -------------------------------------------------------------
 
 // `field` must match the backend's DOC_FIELD_TO_TYPE map.
-// `requiresGst` documents are hidden when the vendor is not GST registered.
+// Two flags describe what happens when the vendor is not GST registered:
+//   requiresGst     — hidden entirely, and not required
+//   optionalWhenUrp — still offered, but no longer required
 export const KYC_DOCUMENT_FIELDS = [
   { field: 'panCard', label: 'PAN Card', required: true },
   { field: 'gstCertificate', label: 'GST Certificate', required: true, requiresGst: true },
   { field: 'cancelledCheque', label: 'Cancelled Cheque', required: true },
-  { field: 'companyRegistration', label: 'Company Registration Document', required: true },
+  { field: 'companyRegistration', label: 'Company Registration Document', required: true, optionalWhenUrp: true },
   { field: 'aadhaarCard', label: 'Aadhaar Card', required: false },
   { field: 'msmeCertificate', label: 'MSME Certificate', required: false },
   { field: 'agreementUpload', label: 'Agreement', required: false },
@@ -70,11 +72,26 @@ const GST_RX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 export const isValidGst = (value) => GST_RX.test(String(value ?? '').trim().toUpperCase());
 
 /**
- * Documents to show for the GST value entered. When the vendor is unregistered
- * the GST certificate drops out entirely — it is neither shown nor required.
+ * Whether a document must be uploaded for the GST value entered. An
+ * unregistered (URP) vendor has neither a GST certificate nor a company
+ * registration document, so both stop being mandatory.
+ *
+ * Mirrors requiredDocumentsFor() in the backend's kycConstants.js.
  */
-export const visibleDocuments = (documents, gstValue) =>
-  documents.filter((d) => !(d.requiresGst && isUrp(gstValue)));
+export const isDocumentRequired = (doc, gstValue) =>
+  Boolean(doc.required) && !((doc.requiresGst || doc.optionalWhenUrp) && isUrp(gstValue));
+
+/**
+ * The document slots to show for the GST value entered, each with `required`
+ * already resolved — so the asterisk, the validation and the backend all agree.
+ *
+ * A `requiresGst` document disappears when the vendor is unregistered; an
+ * `optionalWhenUrp` one stays on offer and simply stops being mandatory.
+ */
+export const documentsFor = (documents, gstValue) =>
+  documents
+    .filter((d) => !(d.requiresGst && isUrp(gstValue)))
+    .map((d) => ({ ...d, required: isDocumentRequired(d, gstValue) }));
 
 /**
  * Fallback service list. The live list comes from the form endpoint so the
