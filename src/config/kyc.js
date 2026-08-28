@@ -6,7 +6,7 @@
 
 export const MAX_FILE_MB = 1;
 export const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
-export const MAX_FILES = 8;
+export const MAX_FILES = 12;
 
 export const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'pdf', 'xls', 'xlsx'];
 export const ALLOWED_LABEL = 'JPG, JPEG, PDF, XLS or XLSX';
@@ -58,9 +58,11 @@ export const KYC_DOCUMENT_FIELDS = [
   { field: 'panCard', label: 'PAN Card', required: true },
   { field: 'gstCertificate', label: 'GST Certificate', required: true, requiresGst: true },
   { field: 'cancelledCheque', label: 'Cancelled Cheque', required: true },
-  { field: 'companyRegistration', label: 'Company Registration Document', required: true, optionalWhenUrp: true },
+  { field: 'incorporationCertificate', label: 'Incorporation Certificate (CIN)', required: false },
   { field: 'aadhaarCard', label: 'Aadhaar Card', required: false },
   { field: 'msmeCertificate', label: 'MSME Certificate', required: false },
+  { field: 'balanceSheet', label: 'Balance Sheet', required: false },
+  { field: 'profitLoss', label: 'Profit & Loss (P&L) Statement', required: false },
   { field: 'agreementUpload', label: 'Agreement', required: false },
 ];
 
@@ -73,8 +75,9 @@ export const isValidGst = (value) => GST_RX.test(String(value ?? '').trim().toUp
 
 /**
  * Whether a document must be uploaded for the GST value entered. An
- * unregistered (URP) vendor has neither a GST certificate nor a company
- * registration document, so both stop being mandatory.
+ * unregistered (URP) vendor has no GST certificate, so it stops being
+ * mandatory; an `optionalWhenUrp` document would do the same while staying
+ * visible.
  *
  * Mirrors requiredDocumentsFor() in the backend's kycConstants.js.
  */
@@ -105,18 +108,63 @@ export const OTHER_SERVICES = [
   'Air & Sea Freight and Custom Clearance',
 ];
 
+// --- Service location & company size ---------------------------------------
+// Fallbacks only. The live lists come from the form endpoint so the backend
+// stays authoritative (mirrors INDIAN_STATES / COMPANY_SIZES in kycConstants).
+
+export const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
+  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
+  'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  'Andaman and Nicobar Islands', 'Chandigarh',
+  'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Jammu and Kashmir',
+  'Ladakh', 'Lakshadweep', 'Puducherry',
+];
+
+export const COMPANY_SIZES = ['1-10', '11-50', '51-200', '201-500', '501-1000', '1000+'];
+
+export const MAX_OTHER_STATE_GST = 36;
+
+// --- Per-form configuration -------------------------------------------------
+
+// Which sections each workflow shows. The form endpoint sends these flags on
+// every load; this is the fallback for a failed fetch.
+export const KYC_FORM_CONFIG = {
+  purchase: {
+    kycType: 'purchase',
+    label: 'Purchase Department KYC',
+    collectsMaterials: true,
+    collectsServices: false,
+    collectsVehicles: false,
+  },
+  operations: {
+    kycType: 'operations',
+    label: 'Operations Department KYC',
+    collectsMaterials: false,
+    collectsServices: true,
+    collectsVehicles: true,
+  },
+};
+
+export const formConfigFor = (kycType) =>
+  KYC_FORM_CONFIG[kycType] || KYC_FORM_CONFIG.purchase;
+
 export const docTypeLabel = (docType) =>
   ({
     pan_card: 'PAN Card',
     gst_certificate: 'GST Certificate',
     cancelled_cheque: 'Cancelled Cheque',
-    company_registration: 'Company Registration Document',
+    incorporation_certificate: 'Incorporation Certificate (CIN)',
     aadhaar_card: 'Aadhaar Card',
     msme_certificate: 'MSME Certificate',
+    balance_sheet: 'Balance Sheet',
+    profit_loss: 'Profit & Loss (P&L) Statement',
     agreement: 'Agreement',
-    // Legacy types from the first release
+    // Legacy types — no longer collected, but old submissions still carry them
+    company_registration: 'Company Registration Document',
     bank_statement: 'Bank Statement',
-    incorporation_certificate: 'Certificate of Incorporation',
     other: 'Other Document',
   }[docType] || 'Document');
 

@@ -408,6 +408,11 @@ const Header = () => {
     { to: '/finance/vendors', label: 'Vendors', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
   ];
 
+  // Operations navigation — vendor KYC for the Operations workflow
+  const operationsLinks = [
+    { to: '/operations/vendors', label: 'Vendors', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+  ];
+
   // Director Department — approvals and purchase-order oversight.
   // Only reachable by Admin and Director; the department itself is hidden from
   // every other role in SelectDepartment.
@@ -429,6 +434,7 @@ const Header = () => {
   else if (activeDepartment === 'purchase') links = purchaseLinks;
   else if (activeDepartment === 'finance') links = financeLinks;
   else if (activeDepartment === 'director') links = directorLinks;
+  else if (activeDepartment === 'operations') links = operationsLinks;
   else links = isAdmin() ? adminLinks : salesLinks;
   // Secondary/occasional items are kept off the compact mobile bottom bar
   const mobileHiddenLabels = ['Analytics', 'Assign Leads', 'HR Leads', 'Users', 'Rate Comparison'];

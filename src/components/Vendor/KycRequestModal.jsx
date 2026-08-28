@@ -1,37 +1,56 @@
 import { useState, useEffect, useRef } from 'react';
+import { kycTypesForUser, kycTypeLabel } from '../../config/departments';
 
 /**
  * "Generate KYC Link" — the second, independent way to add a vendor.
  *
- * Asks for nothing. Opening this mints a unique link straight away; the vendor
- * supplies every detail, including their own name, through the form. Adding a
- * vendor manually never generates a link.
+ * There are two KYC workflows, Purchase and Operations. A user who may only
+ * generate one of them gets it straight away, asked for nothing, exactly as
+ * before. Finance and administrators may generate either, so they pick first.
+ * Adding a vendor manually never generates a link.
  */
-const KycRequestModal = ({ onClose, onGenerate, onMarkSent }) => {
+const KycRequestModal = ({ onClose, onGenerate, onMarkSent, user, defaultKycType }) => {
+  const choices = kycTypesForUser(user);
+  // Pre-select the department being browsed when it is one of the options
+  const preset = choices.length === 1
+    ? choices[0].value
+    : (choices.some((c) => c.value === defaultKycType) ? defaultKycType : null);
+
+  const [kycType, setKycType] = useState(preset);
   const [result, setResult] = useState(null); // { kycLink, vendor }
-  const [busy, setBusy] = useState(true);
+  // Only auto-generate when there is nothing to ask
+  const [busy, setBusy] = useState(Boolean(preset));
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [sentNote, setSentNote] = useState('');
   const started = useRef(false);
 
-  const generate = async () => {
+  const generate = async (type) => {
+    const chosen = type || kycType;
+    if (!chosen) return;
     setBusy(true);
     setError('');
-    const res = await onGenerate({});
+    const res = await onGenerate({ kycType: chosen });
     setBusy(false);
     if (res.success) setResult(res.data);
     else setError(res.message || 'Could not generate the link.');
   };
 
-  // Mint the link as soon as the dialog opens. The ref guard stops React's
-  // development double-invoke from creating two vendor records.
+  // Mint the link as soon as the dialog opens, when the type is already known.
+  // The ref guard stops React's development double-invoke from creating two
+  // vendor records.
   useEffect(() => {
-    if (started.current) return;
+    if (started.current || !preset) return;
     started.current = true;
-    generate();
+    generate(preset);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const choose = (value) => {
+    setKycType(value);
+    started.current = true;
+    generate(value);
+  };
 
   const copy = async () => {
     try {
@@ -74,9 +93,13 @@ const KycRequestModal = ({ onClose, onGenerate, onMarkSent }) => {
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-200">
           <div>
-            <h2 className="text-base font-semibold text-gray-800">Generate KYC Link</h2>
+            <h2 className="text-base font-semibold text-gray-800">
+              Generate {kycType ? `${kycTypeLabel(kycType)} ` : ''}KYC Link
+            </h2>
             <p className="text-[11px] text-gray-500 mt-0.5">
-              {result ? 'Share this link with the vendor.' : 'Creating a unique link...'}
+              {result
+                ? 'Share this link with the vendor.'
+                : (kycType ? 'Creating a unique link...' : 'Which KYC form should the vendor fill in?')}
             </p>
           </div>
           <button onClick={() => !busy && onClose()} className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-40"
@@ -88,6 +111,28 @@ const KycRequestModal = ({ onClose, onGenerate, onMarkSent }) => {
         </div>
 
         <div className="p-5 space-y-3.5">
+          {!kycType && !busy && !error && (
+            <div className="space-y-2">
+              <p className="text-xs text-gray-600">
+                The two forms collect different details, and the vendor sees only the one you choose.
+              </p>
+              {choices.map((c) => (
+                <button
+                  key={c.value}
+                  onClick={() => choose(c.value)}
+                  className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-amber-400 hover:bg-amber-50 transition-colors"
+                >
+                  <span className="block text-sm font-semibold text-gray-800">{c.label}</span>
+                  <span className="block text-[11px] text-gray-500 mt-0.5">
+                    {c.value === 'purchase'
+                      ? 'Collects the materials the vendor supplies.'
+                      : 'Collects the services the vendor provides and their vehicle count.'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {busy && (
             <div className="py-8 text-center">
               <svg className="animate-spin h-7 w-7 mx-auto text-amber-500" fill="none" viewBox="0 0 24 24">
@@ -106,7 +151,7 @@ const KycRequestModal = ({ onClose, onGenerate, onMarkSent }) => {
                   className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
                   Close
                 </button>
-                <button onClick={generate}
+                <button onClick={() => generate()}
                   className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-amber-600 rounded-lg hover:bg-amber-700">
                   Try Again
                 </button>

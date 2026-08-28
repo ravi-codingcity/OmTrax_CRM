@@ -6,6 +6,7 @@ import KycDocumentUpload from '../components/Kyc/KycDocumentUpload';
 import {
   KYC_DOCUMENT_FIELDS, MAX_FILE_MB, ALLOWED_LABEL,
   URP_VALUE, isUrp, isValidGst, documentsFor, OTHER_SERVICES,
+  INDIAN_STATES, COMPANY_SIZES, MAX_OTHER_STATE_GST, formConfigFor,
 } from '../config/kyc';
 import omtrax_logo from '../assets/OmTrax.png';
 
@@ -84,17 +85,31 @@ const KycForm = () => {
   const [uploadsEnabled, setUploadsEnabled] = useState(true);
   const [docFields, setDocFields] = useState(KYC_DOCUMENT_FIELDS);
 
+  // Which of the two workflows this link opens. The server decides; this is
+  // only the fallback until the form loads.
+  const [formCfg, setFormCfg] = useState(formConfigFor('purchase'));
+
   const [form, setForm] = useState({
     vendorName: '', companyName: '', contactPerson: '', email: '', phone: '',
     address: '', city: '', state: '', pincode: '',
     gstNumber: '', panNumber: '',
     bankName: '', accountHolderName: '', accountNumber: '', ifscCode: '',
     kycAdditionalInfo: '',
+    // Optional statutory details
+    esiNumber: '', pfNumber: '', shopEstablishmentNumber: '', iecCode: '',
+    companySize: '', serviceLocation: '',
+    // Operations only
+    numberOfVehicles: '',
   });
   const [materials, setMaterials] = useState([]);
   const [services, setServices] = useState([]);
   const [materialOptions, setMaterialOptions] = useState([]);
   const [serviceOptions, setServiceOptions] = useState(OTHER_SERVICES);
+  const [stateOptions, setStateOptions] = useState(INDIAN_STATES);
+  const [companySizeOptions, setCompanySizeOptions] = useState(COMPANY_SIZES);
+  // Extra state registrations. Hidden until the vendor says they have them.
+  const [hasOtherStateGst, setHasOtherStateGst] = useState(false);
+  const [otherStateGst, setOtherStateGst] = useState([]);
   const [files, setFiles] = useState({});
   const [fileErrors, setFileErrors] = useState({});
   const [errors, setErrors] = useState([]);
@@ -112,6 +127,15 @@ const KycForm = () => {
       const d = res.data.data;
       setUploadsEnabled(d.uploadsEnabled !== false);
       if (Array.isArray(d.documents) && d.documents.length) setDocFields(d.documents);
+      // Which sections to show comes from the server, so the vendor can never
+      // be shown a section their form does not collect.
+      setFormCfg({
+        ...formConfigFor(d.kycType),
+        ...(d.kycTypeLabel ? { label: d.kycTypeLabel } : {}),
+        ...(typeof d.collectsMaterials === 'boolean' ? { collectsMaterials: d.collectsMaterials } : {}),
+        ...(typeof d.collectsServices === 'boolean' ? { collectsServices: d.collectsServices } : {}),
+        ...(typeof d.collectsVehicles === 'boolean' ? { collectsVehicles: d.collectsVehicles } : {}),
+      });
       setForm((p) => ({
         ...p,
         vendorName: d.vendorName || '',
@@ -125,12 +149,27 @@ const KycForm = () => {
         pincode: d.pincode || '',
         gstNumber: d.gstNumber || '',
         panNumber: d.panNumber || '',
+        esiNumber: d.esiNumber || '',
+        pfNumber: d.pfNumber || '',
+        shopEstablishmentNumber: d.shopEstablishmentNumber || '',
+        iecCode: d.iecCode || '',
+        companySize: d.companySize || '',
+        serviceLocation: d.serviceLocation || '',
+        numberOfVehicles: d.numberOfVehicles === 0 || d.numberOfVehicles ? String(d.numberOfVehicles) : '',
       }));
       // Dropdown sources. Materials come from the Purchase Department's item
       // master via the form endpoint, so anything the Purchase Manager adds
       // shows up here without a code change.
       if (Array.isArray(d.materialOptions)) setMaterialOptions(d.materialOptions);
       if (Array.isArray(d.serviceOptions) && d.serviceOptions.length) setServiceOptions(d.serviceOptions);
+      if (Array.isArray(d.stateOptions) && d.stateOptions.length) setStateOptions(d.stateOptions);
+      if (Array.isArray(d.companySizeOptions) && d.companySizeOptions.length) {
+        setCompanySizeOptions(d.companySizeOptions);
+      }
+      if (Array.isArray(d.otherStateGst) && d.otherStateGst.length) {
+        setOtherStateGst(d.otherStateGst.map((g) => ({ state: g.state || '', gstNumber: g.gstNumber || '' })));
+        setHasOtherStateGst(true);
+      }
 
       // Both selectors work on plain name strings
       if (Array.isArray(d.materials) && d.materials.length) {
@@ -152,6 +191,19 @@ const KycForm = () => {
   useEffect(() => { load(); }, [load]);
 
   const setField = (name, value) => setForm((p) => ({ ...p, [name]: value }));
+
+  // --- Other-state GST rows ---
+  const addStateGst = () =>
+    setOtherStateGst((p) => (p.length >= MAX_OTHER_STATE_GST ? p : [...p, { state: '', gstNumber: '' }]));
+  const removeStateGst = (i) => setOtherStateGst((p) => p.filter((_, x) => x !== i));
+  const setStateGst = (i, key, value) =>
+    setOtherStateGst((p) => p.map((row, x) => (x === i ? { ...row, [key]: value } : row)));
+
+  // Unticking the box discards the rows, so a hidden section can never submit
+  const toggleOtherStateGst = (checked) => {
+    setHasOtherStateGst(checked);
+    setOtherStateGst(checked ? (otherStateGst.length ? otherStateGst : [{ state: '', gstNumber: '' }]) : []);
+  };
 
   const onFileChange = (field, file, problem) => {
     setFiles((p) => {
@@ -200,8 +252,27 @@ const KycForm = () => {
       problems.push(`Enter a valid GST number, or ${URP_VALUE} if you are not GST registered`);
     }
 
-    if (!materials.length && !services.length) {
-      problems.push('Select at least one material or service you provide');
+    // Each form asks for only what it collects
+    if (formCfg.collectsMaterials && !materials.length) {
+      problems.push('Select at least one material you supply');
+    }
+    if (formCfg.collectsServices && !services.length) {
+      problems.push('Select at least one service you provide');
+    }
+
+    if (hasOtherStateGst) {
+      const seen = new Set();
+      otherStateGst.forEach((row, i) => {
+        const st = (row.state || '').trim();
+        const gstNo = (row.gstNumber || '').trim().toUpperCase();
+        if (!st && !gstNo) return;              // an untouched row is fine
+        const at = `Other state GST #${i + 1}`;
+        if (!st) problems.push(`${at}: select a state`);
+        else if (seen.has(st)) problems.push(`${at}: ${st} is listed more than once`);
+        else seen.add(st);
+        if (!gstNo) problems.push(`${at}: enter the GST number`);
+        else if (!isValidGst(gstNo)) problems.push(`${at}: "${gstNo}" is not a valid GST number`);
+      });
     }
 
     if (hasFileErrors) problems.push('Fix or remove the documents marked invalid');
@@ -224,8 +295,16 @@ const KycForm = () => {
     Object.entries(form).forEach(([k, v]) => fd.append(k, v));
     // Multipart cannot carry a real array, so the lists travel as JSON.
     // Materials and services are kept separate all the way into MongoDB.
-    fd.append('materials', JSON.stringify(materials.map((m) => ({ materialName: m }))));
-    fd.append('services', JSON.stringify(services.map((sv) => ({ serviceName: sv }))));
+    fd.append('materials', JSON.stringify(formCfg.collectsMaterials ? materials.map((m) => ({ materialName: m })) : []));
+    fd.append('services', JSON.stringify(formCfg.collectsServices ? services.map((sv) => ({ serviceName: sv })) : []));
+    // Only the rows the vendor can actually see are sent
+    fd.append('otherStateGst', JSON.stringify(
+      hasOtherStateGst
+        ? otherStateGst
+            .filter((r) => (r.state || '').trim() || (r.gstNumber || '').trim())
+            .map((r) => ({ state: r.state.trim(), gstNumber: r.gstNumber.trim().toUpperCase() }))
+        : []
+    ));
     Object.entries(files).forEach(([field, file]) => fd.append(field, file));
 
     try {
@@ -319,7 +398,7 @@ const KycForm = () => {
         <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-6 py-4 border-b border-amber-100">
           <h1 className="text-lg font-semibold text-gray-800">Vendor KYC Form</h1>
           <p className="text-xs text-gray-600 mt-0.5">
-            Please complete all required fields and upload the listed documents.
+            {formCfg.label} &middot; please complete all required fields and upload the listed documents.
           </p>
         </div>
 
@@ -367,12 +446,133 @@ const KycForm = () => {
               <Field name="city" title="City" placeholder="City" {...f} />
               <Field name="state" title="State" placeholder="State" {...f} />
               <Field name="pincode" title="Pincode" placeholder="6-digit" {...f} />
+
+              <div className="sm:col-span-2 border-t border-gray-100 pt-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasOtherStateGst}
+                    onChange={(e) => toggleOtherStateGst(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    Do you have GST registration in other states?
+                  </span>
+                </label>
+
+                {hasOtherStateGst && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-[11px] text-gray-500">
+                      Add each additional state and the GST number registered there.
+                    </p>
+                    {otherStateGst.map((row, i) => (
+                      <div key={i} className="flex flex-col sm:flex-row gap-2">
+                        <select
+                          value={row.state}
+                          onChange={(e) => setStateGst(i, 'state', e.target.value)}
+                          className={`${INPUT_CLS} sm:flex-1`}
+                          disabled={submitting}
+                        >
+                          <option value="">Select state / UT</option>
+                          {stateOptions.map((st) => (
+                            <option key={st} value={st}>{st}</option>
+                          ))}
+                        </select>
+                        <input
+                          value={row.gstNumber}
+                          onChange={(e) => setStateGst(i, 'gstNumber', e.target.value)}
+                          className={`${INPUT_CLS} sm:flex-1`}
+                          placeholder="GST number for that state"
+                          disabled={submitting}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeStateGst(i)}
+                          disabled={submitting}
+                          className="px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg border border-red-200 disabled:opacity-50"
+                          aria-label={`Remove other state GST ${i + 1}`}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={addStateGst}
+                      disabled={submitting || otherStateGst.length >= MAX_OTHER_STATE_GST}
+                      className="text-xs font-semibold text-amber-700 hover:text-amber-800 disabled:opacity-50"
+                    >
+                      + Add another state
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </Section>
 
           <Section
-            title="Material / Service Details"
-            hint="Choose everything you supply. You can add as many materials and services as you need, and remove any before submitting."
+            title="Company & Statutory Details"
+            hint="All optional — fill in whatever applies to your business."
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field name="esiNumber" title="ESI Number" placeholder="ESI registration number" {...f} />
+              <Field name="pfNumber" title="PF Number" placeholder="Provident Fund number" {...f} />
+              <Field name="shopEstablishmentNumber" title="Shop Establishment Number" placeholder="Shop & Establishment registration" {...f} />
+              <Field name="iecCode" title="IEC Code" placeholder="Import Export Code" {...f} />
+
+              <div>
+                <label className={LABEL_CLS}>Company Size</label>
+                <select
+                  value={form.companySize}
+                  onChange={(e) => setField('companySize', e.target.value)}
+                  className={INPUT_CLS}
+                  disabled={submitting}
+                >
+                  <option value="">Select company size</option>
+                  {companySizeOptions.map((c) => (
+                    <option key={c} value={c}>{c} employees</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className={LABEL_CLS}>Service Location</label>
+                <select
+                  value={form.serviceLocation}
+                  onChange={(e) => setField('serviceLocation', e.target.value)}
+                  className={INPUT_CLS}
+                  disabled={submitting}
+                >
+                  <option value="">Select state / UT</option>
+                  {stateOptions.map((st) => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  Where you provide your services.
+                </p>
+              </div>
+
+              {formCfg.collectsVehicles && (
+                <Field
+                  name="numberOfVehicles"
+                  title="Number of Vehicles"
+                  type="number"
+                  placeholder="e.g. 12"
+                  hint="Vehicles available for your operations services"
+                  {...f}
+                />
+              )}
+            </div>
+          </Section>
+
+          <Section
+            title={formCfg.collectsMaterials ? 'Material Details' : 'Service Details'}
+            hint={
+              formCfg.collectsMaterials
+                ? 'Choose every material you supply. Add as many as you need, and remove any before submitting.'
+                : 'Choose every service you provide. Add as many as you need, and remove any before submitting.'
+            }
           >
             <MaterialServiceSelector
               materials={materials}
@@ -381,6 +581,8 @@ const KycForm = () => {
               serviceOptions={serviceOptions}
               onChangeMaterials={setMaterials}
               onChangeServices={setServices}
+              showMaterials={formCfg.collectsMaterials}
+              showServices={formCfg.collectsServices}
               disabled={submitting}
             />
           </Section>
@@ -396,9 +598,8 @@ const KycForm = () => {
             )}
             {unregistered && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-3 text-xs text-blue-800">
-                You selected <strong>{URP_VALUE}</strong> (Unregistered Proprietorship), so the
-                GST Certificate is not needed and the Company Registration Document is
-                optional — upload it only if you have one.
+                You selected <strong>{URP_VALUE}</strong> (Unregistered Proprietorship),
+                so the GST Certificate is not needed.
               </div>
             )}
             <KycDocumentUpload

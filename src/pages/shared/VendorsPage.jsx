@@ -265,6 +265,9 @@ const VendorsPage = ({ department = 'purchase' }) => {
           onClose={() => { setKycRequestOpen(false); loadData(); }}
           onGenerate={createKycRequest}
           onMarkSent={markKycLinkSent}
+          user={user}
+          // Browsing Operations offers the Operations form first
+          defaultKycType={department === 'operations' ? 'operations' : 'purchase'}
         />
       )}
 

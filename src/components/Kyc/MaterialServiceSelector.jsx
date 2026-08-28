@@ -122,45 +122,64 @@ const SelectionList = ({
 /**
  * Material and service selection for the Vendor KYC form.
  *
- * A vendor may supply materials, provide services, or both — so these are two
- * separate lists rather than one free-text field. Materials come from the
- * Purchase Department's item master (so new materials appear here without a code
- * change); services come from a fixed list. Both are stored separately.
+ * Which lists appear depends on the workflow: the Purchase form collects
+ * materials (from the Purchase Department's item master, so new ones appear
+ * here without a code change) and the Operations form collects services (from
+ * a fixed list). Both are stored separately. `showMaterials` / `showServices`
+ * default to true so any caller predating the split behaves as before.
  */
 const MaterialServiceSelector = ({
-  materials, services, materialOptions = [], serviceOptions = [], onChangeMaterials, onChangeServices, disabled = false,
-}) => (
-  <div className="space-y-2.5">
-    <SelectionList
-      title="Materials"
-      tone="amber"
-      hint="Materials we purchase. Select each one you can supply."
-      emptyText="No materials selected yet."
-      addLabel="Add Material"
-      options={materialOptions}
-      selected={materials}
-      onChange={onChangeMaterials}
-      disabled={disabled}
-    />
+  materials, services, materialOptions = [], serviceOptions = [],
+  onChangeMaterials, onChangeServices, disabled = false,
+  showMaterials = true, showServices = true,
+}) => {
+  // What this form actually asks for decides when to nudge the vendor
+  const nothingChosen =
+    (!showMaterials || materials.length === 0) && (!showServices || services.length === 0);
 
-    <SelectionList
-      title="Other Services"
-      tone="blue"
-      hint="Logistics, labour and other professional services you provide."
-      emptyText="No services selected yet."
-      addLabel="Add Service"
-      options={serviceOptions}
-      selected={services}
-      onChange={onChangeServices}
-      disabled={disabled}
-    />
+  const prompt = showMaterials && showServices
+    ? 'Select at least one material or service before submitting.'
+    : (showMaterials
+      ? 'Select at least one material before submitting.'
+      : 'Select at least one service before submitting.');
 
-    {materials.length === 0 && services.length === 0 && (
-      <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-        Select at least one material or service before submitting.
-      </p>
-    )}
-  </div>
-);
+  return (
+    <div className="space-y-2.5">
+      {showMaterials && (
+        <SelectionList
+          title="Materials"
+          tone="amber"
+          hint="Materials we purchase. Select each one you can supply."
+          emptyText="No materials selected yet."
+          addLabel="Add Material"
+          options={materialOptions}
+          selected={materials}
+          onChange={onChangeMaterials}
+          disabled={disabled}
+        />
+      )}
+
+      {showServices && (
+        <SelectionList
+          title="Other Services"
+          tone="blue"
+          hint="Logistics, labour and other professional services you provide."
+          emptyText="No services selected yet."
+          addLabel="Add Service"
+          options={serviceOptions}
+          selected={services}
+          onChange={onChangeServices}
+          disabled={disabled}
+        />
+      )}
+
+      {nothingChosen && (
+        <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          {prompt}
+        </p>
+      )}
+    </div>
+  );
+};
 
 export default MaterialServiceSelector;

@@ -256,6 +256,18 @@ function App() {
                 }
               />
 
+              {/* Operations Department — its own vendor register and KYC
+                  workflow. Shares VendorsPage; the backend scopes what it
+                  returns to the Operations KYC type. */}
+              <Route
+                path="/operations/vendors"
+                element={
+                  <ProtectedRoute requiredDepartment="operations">
+                    <VendorsPage department="operations" />
+                  </ProtectedRoute>
+                }
+              />
+
               {/* Director Department — visible only to Admin and Director.
                   ProtectedRoute's requiredRole="admin" resolves true for both,
                   since they share the same CRM authority. */}

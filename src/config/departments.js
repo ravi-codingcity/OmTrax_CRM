@@ -39,6 +39,13 @@ export const DEPARTMENTS = [
     color: 'amber',
     icon: 'M9 7h6m-6 4h6m-6 4h4M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z',
   },
+  {
+    key: 'operations',
+    label: 'Operations',
+    description: 'Operations tasks & vendor KYC',
+    color: 'cyan',
+    icon: 'M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0zM13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0',
+  },
 ];
 
 export const DEFAULT_DEPARTMENT = 'relocation';
@@ -65,6 +72,10 @@ export const ROLES_BY_DEPARTMENT = {
   ],
   // No dedicated roles — only the cross-department Admin and Director may enter
   director: [],
+  operations: [
+    { value: 'operations_manager', label: 'Operations Manager' },
+    { value: 'operations_executive', label: 'Operations Executive' },
+  ],
 };
 
 // Roles that can view all entries within their department (vs. only their own)
@@ -82,7 +93,46 @@ export const FULL_ACCESS_ROLES = [
   'admin', 'director', 'manager', 'hr_manager', 'hr_head',
   'purchase_manager', 'branch_manager', 'warehouse_manager',
   'finance_manager', 'accounts_executive',
+  'operations_manager', 'operations_executive',
 ];
+
+// --- Vendor KYC workflows ---------------------------------------------------
+// Mirrors canGenerateKycLink / canAccessKycType in the backend's department.js.
+// The backend is the enforcement point; these only shape the UI.
+
+export const KYC_TYPES = [
+  { value: 'purchase', label: 'Purchase Department KYC', short: 'Purchase' },
+  { value: 'operations', label: 'Operations Department KYC', short: 'Operations' },
+];
+
+const OPERATIONS_ROLES = ['operations_manager', 'operations_executive'];
+const FINANCE_ROLES = ['finance_manager', 'accounts_executive'];
+const PURCHASE_ROLES = ['purchase_manager', 'branch_manager', 'warehouse_manager'];
+
+export const isOperationsUser = (user) => OPERATIONS_ROLES.includes(user?.role);
+export const isFinanceUser = (user) => FINANCE_ROLES.includes(user?.role);
+export const isPurchaseUser = (user) => PURCHASE_ROLES.includes(user?.role);
+
+// Finance and administrators reach both workflows; everyone else only their own
+export const canGenerateKycLink = (user, kycType = 'purchase') => {
+  if (isAdminLevel(user) || isFinanceUser(user)) return true;
+  if (kycType === 'operations') return isOperationsUser(user);
+  return user?.role === 'purchase_manager';
+};
+
+export const canAccessKycType = (user, kycType) => {
+  if (isAdminLevel(user) || isFinanceUser(user)) return true;
+  if (kycType === 'operations') return isOperationsUser(user);
+  if (kycType === 'purchase') return isPurchaseUser(user);
+  return false;
+};
+
+// The KYC types this user may generate — drives the picker on the Vendors page
+export const kycTypesForUser = (user) =>
+  KYC_TYPES.filter((t) => canGenerateKycLink(user, t.value));
+
+export const kycTypeLabel = (value) =>
+  KYC_TYPES.find((t) => t.value === value)?.short || 'Purchase';
 
 export const getDepartment = (key) =>
   DEPARTMENTS.find((d) => d.key === key) || DEPARTMENTS[0];
