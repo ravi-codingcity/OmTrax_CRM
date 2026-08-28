@@ -1,6 +1,6 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import {
-  ACCEPT_ATTR, MAX_FILE_MB, ALLOWED_LABEL, validateKycFile,
+  MAX_FILE_MB, validateKycFile, acceptAttrFor, labelFor,
   formatBytes, fileKindOf, isPreviewable,
 } from '../../config/kyc';
 
@@ -51,8 +51,16 @@ const DocumentSlot = ({ doc, file, error, disabled, onSelect, onRemove }) => {
       ? { label: 'Ready to upload', cls: 'bg-green-100 text-green-700' }
       : { label: 'Not selected', cls: 'bg-gray-100 text-gray-500' };
 
+  // A mandatory slot keeps a red edge until it is satisfied, so what is still
+  // outstanding is obvious at a glance.
+  const frame = error
+    ? 'border-red-300 bg-red-50/40'
+    : file
+      ? 'border-green-300 bg-green-50/30'
+      : (doc.required ? 'border-red-200 bg-red-50/20 border-l-2 border-l-red-500' : 'border-gray-200');
+
   return (
-    <div className={`border rounded-lg p-3 transition-colors ${error ? 'border-red-300 bg-red-50/40' : file ? 'border-green-300 bg-green-50/30' : 'border-gray-200'}`}>
+    <div className={`border rounded-lg p-2.5 transition-colors duration-200 ${frame}`}>
       <div className="flex items-start gap-3">
         {file ? <KindIcon kind={kind} /> : (
           <div className="w-9 h-9 rounded-lg bg-gray-100 text-gray-400 flex items-center justify-center flex-shrink-0">
@@ -66,9 +74,7 @@ const DocumentSlot = ({ doc, file, error, disabled, onSelect, onRemove }) => {
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-sm font-medium text-gray-800">
               {doc.label}{' '}
-              {doc.required
-                ? <span className="text-red-500">*</span>
-                : <span className="text-[10px] font-normal text-gray-400">(optional)</span>}
+              {doc.required && <span className="text-red-500 font-bold">*</span>}
             </p>
             <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${status.cls}`}>{status.label}</span>
           </div>
@@ -79,7 +85,7 @@ const DocumentSlot = ({ doc, file, error, disabled, onSelect, onRemove }) => {
             </p>
           ) : (
             <p className="text-[11px] text-gray-400 mt-0.5">
-              {ALLOWED_LABEL} · under {MAX_FILE_MB} MB
+              {labelFor(doc.field)} · under {MAX_FILE_MB} MB
             </p>
           )}
 
@@ -89,7 +95,7 @@ const DocumentSlot = ({ doc, file, error, disabled, onSelect, onRemove }) => {
             <input
               ref={inputRef}
               type="file"
-              accept={ACCEPT_ATTR}
+              accept={acceptAttrFor(doc.field)}
               disabled={disabled}
               className="hidden"
               onChange={(e) => {
@@ -135,13 +141,23 @@ const DocumentSlot = ({ doc, file, error, disabled, onSelect, onRemove }) => {
 };
 
 /**
- * The full set of document slots. Validation runs the moment a file is picked,
- * so the vendor sees a problem immediately rather than on submit.
+ * The full set of document slots.
+ *
+ * Mandatory documents are always visible and carry a red edge. Optional ones
+ * start as a row of checkboxes — the vendor ticks the documents they actually
+ * have, and only those upload areas appear. That keeps a form offering eleven
+ * possible documents short for a vendor who has three of them.
+ *
+ * Validation runs the moment a file is picked, so a problem shows immediately
+ * rather than on submit.
  */
-const KycDocumentUpload = ({ documents, files, errors, disabled = false, onChange }) => {
+const KycDocumentUpload = ({
+  documents, files, errors, disabled = false, onChange,
+}) => {
   const select = (field, file) => {
     if (!file) return onChange(field, null, null);
-    const problem = validateKycFile(file);
+    // Pass the slot so per-field format rules apply (template slots take Word)
+    const problem = validateKycFile(file, field);
     // A rejected file is still shown, with its reason, so the vendor can see
     // exactly which one was wrong instead of it silently vanishing.
     onChange(field, file, problem);
@@ -149,21 +165,110 @@ const KycDocumentUpload = ({ documents, files, errors, disabled = false, onChang
 
   const remove = (field) => onChange(field, null, null);
 
+  const required = documents.filter((d) => d.required);
+  // Template documents (download -> fill -> upload) are shown in full by the
+  // form itself, not behind a checkbox — the vendor needs to see that a
+  // template exists before they can decide whether they have one.
+  const optional = documents.filter((d) => !d.required && !d.isTemplate);
+
+  // Which optional documents the vendor has ticked. A slot already holding a
+  // file counts as ticked without being stored, so a pre-filled form opens in
+  // the right state and no effect is needed to keep the two in step.
+  const [ticked, setTicked] = useState(() => new Set());
+
+  const opened = useMemo(() => {
+    const set = new Set(ticked);
+    documents.forEach((d) => { if (!d.required && files[d.field]) set.add(d.field); });
+    return set;
+  }, [ticked, documents, files]);
+
+  const toggle = (field, checked) => {
+    setTicked((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(field); else next.delete(field);
+      return next;
+    });
+    // Unticking discards anything chosen, so a hidden slot never submits
+    if (!checked && files[field]) onChange(field, null, null);
+  };
+
+  const slotFor = (doc) => (
+    <DocumentSlot
+      doc={doc}
+      file={files[doc.field] || null}
+      error={errors[doc.field] || null}
+      disabled={disabled}
+      onSelect={select}
+      onRemove={remove}
+    />
+  );
+
+  const revealed = optional.filter((d) => opened.has(d.field));
+
   return (
-    // Two per row from tablet up; one per row on phones, where a slot's
-    // controls need the full width to stay tappable.
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-      {documents.map((doc) => (
-        <DocumentSlot
-          key={doc.field}
-          doc={doc}
-          file={files[doc.field] || null}
-          error={errors[doc.field] || null}
-          disabled={disabled}
-          onSelect={select}
-          onRemove={remove}
-        />
-      ))}
+    <div className="space-y-3">
+      {/* Mandatory — always visible */}
+      {required.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-1.5">
+            Required &middot; {required.length}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {required.map((doc) => (
+              <div key={doc.field}>{slotFor(doc)}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Optional — tick what you have */}
+      {optional.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
+            Optional &middot; tick any you have
+          </p>
+
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {optional.map((doc) => {
+              const on = opened.has(doc.field);
+              const done = !!files[doc.field];
+              return (
+                <label
+                  key={doc.field}
+                  className={`inline-flex items-center gap-2 pl-2.5 pr-3 py-1.5 rounded-lg border text-sm
+                              cursor-pointer transition-all duration-200 select-none ${
+                    done
+                      ? 'border-green-300 bg-green-50 text-green-800'
+                      : on
+                        ? 'border-amber-300 bg-amber-50 text-amber-800'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-amber-300 hover:bg-amber-50/40'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={(e) => toggle(doc.field, e.target.checked)}
+                    disabled={disabled}
+                    className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span className="truncate max-w-[18rem]">{doc.label}</span>
+                  {done && <span className="text-green-600 font-bold">&#10003;</span>}
+                </label>
+              );
+            })}
+          </div>
+
+          {revealed.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {revealed.map((doc) => (
+                <div key={doc.field} className="animate-[fadeIn_200ms_ease-out]">
+                  {slotFor(doc)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

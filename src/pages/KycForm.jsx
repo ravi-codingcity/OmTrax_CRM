@@ -2,13 +2,34 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { kycAPI } from '../services/api';
 import MaterialServiceSelector from '../components/Kyc/MaterialServiceSelector';
+import ServiceLocationSelector from '../components/Kyc/ServiceLocationSelector';
+import TemplateDocumentCard from '../components/Kyc/TemplateDocumentCard';
+// The real Word templates the vendor downloads, filled in offline and returned
+// through the matching upload slot. `?url` keeps them as static assets.
+import generalAgreementTemplate from '../assets/General Agreement.docx?url';
+import tdsDeclarationTemplate from '../assets/Declaration for Non-Deduction of TDS \u2013 Transporter \u2013 Tax Year 2026-27.docx?url';
+
 import KycDocumentUpload from '../components/Kyc/KycDocumentUpload';
 import {
-  KYC_DOCUMENT_FIELDS, MAX_FILE_MB, ALLOWED_LABEL,
+  KYC_DOCUMENT_FIELDS, MAX_FILE_MB,
   URP_VALUE, isUrp, isValidGst, documentsFor, OTHER_SERVICES,
-  INDIAN_STATES, COMPANY_SIZES, MAX_OTHER_STATE_GST, formConfigFor,
+  INDIAN_STATES, CITIES_BY_STATE, COMPANY_SIZES, MAX_OTHER_STATE_GST, formConfigFor,
 } from '../config/kyc';
 import omtrax_logo from '../assets/OmTrax.png';
+
+// Everything a template slot needs beyond what the server sends
+const TEMPLATE_META = {
+  generalAgreement: {
+    url: generalAgreementTemplate,
+    fileName: 'OmTrax General Agreement.docx',
+    description: 'Download, complete and sign, then upload the finished copy.',
+  },
+  tdsDeclaration: {
+    url: tdsDeclarationTemplate,
+    fileName: 'OmTrax TDS Declaration 2026-27.docx',
+    description: 'For transporters claiming non-deduction of TDS. Tax Year 2026-27.',
+  },
+};
 
 /**
  * PUBLIC Vendor KYC form.
@@ -20,14 +41,14 @@ import omtrax_logo from '../assets/OmTrax.png';
  */
 
 const Shell = ({ children }) => (
-  <div className="min-h-screen bg-gradient-to-br from-slate-50 via-amber-50 to-orange-100 py-8 px-4">
-    <div className="max-w-3xl mx-auto">
-      <div className="text-center mb-6">
-        <img src={omtrax_logo} alt="OmTrax" className="h-10 w-auto mx-auto" />
-        <p className="text-gray-500 text-sm mt-2">Vendor KYC Verification</p>
+  <div className="min-h-screen bg-gradient-to-br from-slate-50 via-amber-50 to-orange-100 py-6 px-3 sm:px-4">
+    <div className="max-w-4xl mx-auto">
+      <div className="text-center mb-4">
+        <img src={omtrax_logo} alt="OmTrax" className="h-9 w-auto mx-auto" />
+        <p className="text-gray-500 text-xs mt-1.5">Vendor KYC Verification</p>
       </div>
       {children}
-      <p className="text-center text-gray-400 text-xs mt-6">© 2026 OmTrax. All rights reserved.</p>
+      <p className="text-center text-gray-400 text-[11px] mt-5">© 2026 OmTrax. All rights reserved.</p>
     </div>
   </div>
 );
@@ -46,14 +67,41 @@ const Notice = ({ tone = 'gray', title, children }) => {
   );
 };
 
-const Section = ({ title, hint, children }) => (
-  <section>
-    <div className="mb-3">
-      <h2 className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{title}</h2>
-      {hint && <p className="text-[11px] text-gray-400 mt-0.5">{hint}</p>}
+const Section = ({ title, hint, step, children }) => (
+  <section className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className="bg-gray-50/80 border-b border-gray-200 px-3 py-2 flex items-baseline gap-2">
+      {step && (
+        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-600 text-white text-[10px] font-bold
+                         flex items-center justify-center leading-none">{step}</span>
+      )}
+      <h2 className="text-xs font-semibold text-gray-700">{title}</h2>
+      {hint && <p className="text-[11px] text-gray-400 truncate hidden sm:block">· {hint}</p>}
     </div>
-    {children}
+    <div className="p-3">
+      {hint && <p className="text-[11px] text-gray-400 mb-2.5 sm:hidden">{hint}</p>}
+      {children}
+    </div>
   </section>
+);
+
+// A checkbox that reveals its field only when ticked. Sized to sit two-per-row
+// so PF and ESI share a single line on desktop.
+const RevealCheckbox = ({ label, checked, onChange, disabled, children }) => (
+  <div className={`border rounded-lg p-2.5 transition-colors duration-200 ${
+    checked ? 'border-amber-300 bg-amber-50/40' : 'border-dashed border-gray-200'
+  }`}>
+    <label className="flex items-center gap-2 cursor-pointer select-none">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        disabled={disabled}
+        className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+      />
+      <span className="text-sm font-medium text-gray-700">{label}</span>
+    </label>
+    {checked && <div className="mt-2 animate-[fadeIn_200ms_ease-out]">{children}</div>}
+  </div>
 );
 
 const INPUT_CLS = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all';
@@ -106,10 +154,17 @@ const KycForm = () => {
   const [materialOptions, setMaterialOptions] = useState([]);
   const [serviceOptions, setServiceOptions] = useState(OTHER_SERVICES);
   const [stateOptions, setStateOptions] = useState(INDIAN_STATES);
+  const [cityOptions, setCityOptions] = useState(CITIES_BY_STATE);
   const [companySizeOptions, setCompanySizeOptions] = useState(COMPANY_SIZES);
+  // Where the vendor operates: many states, each with optional cities
+  const [serviceLocations, setServiceLocations] = useState([]);
   // Extra state registrations. Hidden until the vendor says they have them.
   const [hasOtherStateGst, setHasOtherStateGst] = useState(false);
   const [otherStateGst, setOtherStateGst] = useState([]);
+  // PF and ESI sit behind "do you have one?" — the input only appears on yes,
+  // and neither is ever required.
+  const [hasPf, setHasPf] = useState(false);
+  const [hasEsi, setHasEsi] = useState(false);
   const [files, setFiles] = useState({});
   const [fileErrors, setFileErrors] = useState({});
   const [errors, setErrors] = useState([]);
@@ -135,6 +190,8 @@ const KycForm = () => {
         ...(typeof d.collectsMaterials === 'boolean' ? { collectsMaterials: d.collectsMaterials } : {}),
         ...(typeof d.collectsServices === 'boolean' ? { collectsServices: d.collectsServices } : {}),
         ...(typeof d.collectsVehicles === 'boolean' ? { collectsVehicles: d.collectsVehicles } : {}),
+        ...(d.servicesLabel ? { servicesLabel: d.servicesLabel } : {}),
+        ...(d.departmentLabel ? { departmentLabel: d.departmentLabel } : {}),
       });
       setForm((p) => ({
         ...p,
@@ -163,9 +220,20 @@ const KycForm = () => {
       if (Array.isArray(d.materialOptions)) setMaterialOptions(d.materialOptions);
       if (Array.isArray(d.serviceOptions) && d.serviceOptions.length) setServiceOptions(d.serviceOptions);
       if (Array.isArray(d.stateOptions) && d.stateOptions.length) setStateOptions(d.stateOptions);
+      if (d.citiesByState && typeof d.citiesByState === 'object') setCityOptions(d.citiesByState);
+      if (Array.isArray(d.serviceLocations) && d.serviceLocations.length) {
+        setServiceLocations(d.serviceLocations.map((l) => ({
+          state: l.state || '', cities: Array.isArray(l.cities) ? [...l.cities] : [],
+        })));
+      } else if (d.serviceLocation) {
+        // An older record holding a single state — carry it into the new shape
+        setServiceLocations([{ state: d.serviceLocation, cities: [] }]);
+      }
       if (Array.isArray(d.companySizeOptions) && d.companySizeOptions.length) {
         setCompanySizeOptions(d.companySizeOptions);
       }
+      if (d.pfNumber) setHasPf(true);
+      if (d.esiNumber) setHasEsi(true);
       if (Array.isArray(d.otherStateGst) && d.otherStateGst.length) {
         setOtherStateGst(d.otherStateGst.map((g) => ({ state: g.state || '', gstNumber: g.gstNumber || '' })));
         setHasOtherStateGst(true);
@@ -199,6 +267,15 @@ const KycForm = () => {
   const setStateGst = (i, key, value) =>
     setOtherStateGst((p) => p.map((row, x) => (x === i ? { ...row, [key]: value } : row)));
 
+  const togglePf = (checked) => {
+    setHasPf(checked);
+    if (!checked) setField('pfNumber', '');
+  };
+  const toggleEsi = (checked) => {
+    setHasEsi(checked);
+    if (!checked) setField('esiNumber', '');
+  };
+
   // Unticking the box discards the rows, so a hidden section can never submit
   const toggleOtherStateGst = (checked) => {
     setHasOtherStateGst(checked);
@@ -228,6 +305,12 @@ const KycForm = () => {
   const shownDocs = useMemo(
     () => documentsFor(docFields, form.gstNumber),
     [docFields, form.gstNumber]
+  );
+  // The two template documents keep their own always-visible section, so the
+  // vendor can see a template exists before deciding whether they have one.
+  const templateDocs = useMemo(
+    () => shownDocs.filter((d) => TEMPLATE_META[d.field]),
+    [shownDocs]
   );
   const fileCount = useMemo(() => Object.keys(files).length, [files]);
 
@@ -259,6 +342,14 @@ const KycForm = () => {
     if (formCfg.collectsServices && !services.length) {
       problems.push('Select at least one service you provide');
     }
+
+    const seenLocationStates = new Set();
+    serviceLocations.forEach((l, i) => {
+      const st = (l.state || '').trim();
+      if (!st) { problems.push(`Service location #${i + 1}: select a state`); return; }
+      if (seenLocationStates.has(st)) problems.push(`${st} is listed twice in Service Locations`);
+      seenLocationStates.add(st);
+    });
 
     if (hasOtherStateGst) {
       const seen = new Set();
@@ -298,6 +389,14 @@ const KycForm = () => {
     fd.append('materials', JSON.stringify(formCfg.collectsMaterials ? materials.map((m) => ({ materialName: m })) : []));
     fd.append('services', JSON.stringify(formCfg.collectsServices ? services.map((sv) => ({ serviceName: sv })) : []));
     // Only the rows the vendor can actually see are sent
+    // Structured: each state carries its own cities
+    fd.append('serviceLocations', JSON.stringify(
+      serviceLocations
+        .filter((l) => (l.state || '').trim())
+        .map((l) => ({ state: l.state.trim(), cities: (l.cities || []).map((c) => c.trim()).filter(Boolean) }))
+    ));
+    fd.append('hasPfNumber', String(hasPf));
+    fd.append('hasEsiNumber', String(hasEsi));
     fd.append('otherStateGst', JSON.stringify(
       hasOtherStateGst
         ? otherStateGst
@@ -395,14 +494,14 @@ const KycForm = () => {
   return (
     <Shell>
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-6 py-4 border-b border-amber-100">
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3 border-b border-amber-100">
           <h1 className="text-lg font-semibold text-gray-800">Vendor KYC Form</h1>
           <p className="text-xs text-gray-600 mt-0.5">
             {formCfg.label} &middot; please complete all required fields and upload the listed documents.
           </p>
         </div>
 
-        <div className="p-6 space-y-7">
+        <div className="p-3 sm:p-4 space-y-3">
           {errors.length > 0 && (
             <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
               <p className="text-sm font-medium text-red-800">Please check the following:</p>
@@ -412,14 +511,14 @@ const KycForm = () => {
             </div>
           )}
 
-          <Section title="Vendor Information">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Section title="Vendor Information" step="1" hint="Legal identity and contact details">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               <Field name="vendorName" title="Legal Name (as per PAN)" placeholder="Exactly as printed on your PAN" required hint="Must match your PAN document" {...f} />
               <Field name="companyName" title="Vendor Company Name" placeholder="Your trading / company name" required {...f} />
-              <Field name="address" title="Company Address" placeholder="Full registered address" required className="sm:col-span-2" {...f} />
+              <Field name="address" title="Company Address" placeholder="Full registered address" required className="sm:col-span-2 lg:col-span-3" {...f} />
               <Field name="email" title="Email ID" type="email" placeholder="you@company.com" required {...f} />
               <Field name="phone" title="Phone Number" placeholder="10-digit mobile" required {...f} />
-              <div>
+              <div className="sm:col-span-2 lg:col-span-1">
                 <label className={LABEL_CLS}>
                   GST Number / URP <span className="text-red-500">*</span>
                 </label>
@@ -447,7 +546,7 @@ const KycForm = () => {
               <Field name="state" title="State" placeholder="State" {...f} />
               <Field name="pincode" title="Pincode" placeholder="6-digit" {...f} />
 
-              <div className="sm:col-span-2 border-t border-gray-100 pt-3">
+              <div className="sm:col-span-2 lg:col-span-3 border-t border-gray-100 pt-2.5">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -512,66 +611,77 @@ const KycForm = () => {
 
           <Section
             title="Company & Statutory Details"
-            hint="All optional — fill in whatever applies to your business."
+            step="2"
+            hint="All optional — fill in whatever applies"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field name="esiNumber" title="ESI Number" placeholder="ESI registration number" {...f} />
-              <Field name="pfNumber" title="PF Number" placeholder="Provident Fund number" {...f} />
-              <Field name="shopEstablishmentNumber" title="Shop Establishment Number" placeholder="Shop & Establishment registration" {...f} />
-              <Field name="iecCode" title="IEC Code" placeholder="Import Export Code" {...f} />
-
-              <div>
-                <label className={LABEL_CLS}>Company Size</label>
-                <select
-                  value={form.companySize}
-                  onChange={(e) => setField('companySize', e.target.value)}
-                  className={INPUT_CLS}
-                  disabled={submitting}
-                >
-                  <option value="">Select company size</option>
-                  {companySizeOptions.map((c) => (
-                    <option key={c} value={c}>{c} employees</option>
-                  ))}
-                </select>
+            <div className="space-y-2.5">
+              {/* Shop Establishment / IEC / Company Size on one row */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <Field name="shopEstablishmentNumber" title="Shop Establishment Number" placeholder="Shop & Establishment registration" {...f} />
+                <Field name="iecCode" title="IEC Code" placeholder="Import Export Code" {...f} />
+                <div>
+                  <label className={LABEL_CLS}>Company Size</label>
+                  <select
+                    value={form.companySize}
+                    onChange={(e) => setField('companySize', e.target.value)}
+                    className={INPUT_CLS}
+                    disabled={submitting}
+                  >
+                    <option value="">Select company size</option>
+                    {companySizeOptions.map((c) => (
+                      <option key={c} value={c}>{c} employees</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className={LABEL_CLS}>Service Location</label>
-                <select
-                  value={form.serviceLocation}
-                  onChange={(e) => setField('serviceLocation', e.target.value)}
-                  className={INPUT_CLS}
-                  disabled={submitting}
-                >
-                  <option value="">Select state / UT</option>
-                  {stateOptions.map((st) => (
-                    <option key={st} value={st}>{st}</option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-gray-400 mt-0.5">
-                  Where you provide your services.
-                </p>
+              {/* PF and ESI share one row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <RevealCheckbox label="Do you have PF Number?" checked={hasPf} onChange={togglePf} disabled={submitting}>
+                  <Field name="pfNumber" title="PF Number" placeholder="Provident Fund number" {...f} />
+                </RevealCheckbox>
+
+                <RevealCheckbox label="Do you have ESI Number?" checked={hasEsi} onChange={toggleEsi} disabled={submitting}>
+                  <Field name="esiNumber" title="ESI Number" placeholder="ESI registration number" {...f} />
+                </RevealCheckbox>
               </div>
 
               {formCfg.collectsVehicles && (
-                <Field
-                  name="numberOfVehicles"
-                  title="Number of Vehicles"
-                  type="number"
-                  placeholder="e.g. 12"
-                  hint="Vehicles available for your operations services"
-                  {...f}
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <Field
+                    name="numberOfVehicles"
+                    title="Number of Vehicles"
+                    type="number"
+                    placeholder="e.g. 12"
+                    {...f}
+                  />
+                </div>
               )}
             </div>
           </Section>
 
           <Section
-            title={formCfg.collectsMaterials ? 'Material Details' : 'Service Details'}
+            title="Service Locations"
+            step="3"
+            hint="States you cover — cities optional"
+          >
+            <ServiceLocationSelector
+              locations={serviceLocations}
+              onChange={setServiceLocations}
+              stateOptions={stateOptions}
+              citiesByState={cityOptions}
+              disabled={submitting}
+              maxStates={stateOptions.length}
+            />
+          </Section>
+
+          <Section
+            title={formCfg.collectsMaterials ? 'Material Details' : formCfg.servicesLabel}
+            step="4"
             hint={
               formCfg.collectsMaterials
-                ? 'Choose every material you supply. Add as many as you need, and remove any before submitting.'
-                : 'Choose every service you provide. Add as many as you need, and remove any before submitting.'
+                ? 'Choose every material you supply'
+                : 'Choose every service you provide'
             }
           >
             <MaterialServiceSelector
@@ -583,13 +693,15 @@ const KycForm = () => {
               onChangeServices={setServices}
               showMaterials={formCfg.collectsMaterials}
               showServices={formCfg.collectsServices}
+              servicesLabel={formCfg.servicesLabel}
               disabled={submitting}
             />
           </Section>
 
           <Section
-            title="Required Documents"
-            hint={`${ALLOWED_LABEL} only. Each file must be under ${MAX_FILE_MB} MB.`}
+            title="Documents"
+            step="5"
+            hint={`Tick the optional ones you have · under ${MAX_FILE_MB} MB each`}
           >
             {!uploadsEnabled && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3 text-xs text-amber-800">
@@ -611,8 +723,37 @@ const KycForm = () => {
             />
           </Section>
 
-          <Section title="Bank Details" hint="Optional, but speeds up payment setup.">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {templateDocs.length > 0 && (
+            <Section
+              title="Agreement & TDS Forms"
+              step="6"
+              hint="Download, fill in, then upload \u2014 both optional"
+            >
+              <p className="text-xs text-gray-500 mb-2.5">
+                These two forms are completed offline. Download the template, fill it in,
+                and upload the finished document. You can submit your KYC without them.
+              </p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+                {templateDocs.map((d) => (
+                  <TemplateDocumentCard
+                    key={d.field}
+                    field={d.field}
+                    label={d.label}
+                    description={TEMPLATE_META[d.field].description}
+                    templateUrl={TEMPLATE_META[d.field].url}
+                    templateName={TEMPLATE_META[d.field].fileName}
+                    file={files[d.field]}
+                    error={fileErrors[d.field]}
+                    disabled={submitting || !uploadsEnabled}
+                    onChange={onFileChange}
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
+
+          <Section title="Bank Details" step="7" hint="Optional, but speeds up payment setup">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
               <Field name="bankName" title="Bank Name" placeholder="e.g. HDFC Bank" {...f} />
               <Field name="accountHolderName" title="Account Holder Name" placeholder="As per bank records" {...f} />
               <Field name="accountNumber" title="Account Number" placeholder="Bank account number" {...f} />
@@ -620,11 +761,11 @@ const KycForm = () => {
             </div>
           </Section>
 
-          <Section title="Additional Information">
+          <Section title="Additional Information" step="8">
             <textarea
               value={form.kycAdditionalInfo}
               onChange={(e) => setField('kycAdditionalInfo', e.target.value)}
-              rows={3}
+              rows={2}
               className={`${INPUT_CLS} resize-none`}
               placeholder="Anything else our Finance team should know (optional)"
             />

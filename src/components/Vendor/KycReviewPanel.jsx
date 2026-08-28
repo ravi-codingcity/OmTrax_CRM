@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  kycStatusMeta, kycSourceLabel, fmtDate, fmtDateTime, canReviewKyc, inr,
+  kycStatusMeta, kycDepartmentLabel, fmtDate, fmtDateTime, canReviewKyc, inr,
 } from '../../config/finance';
 import KycDocumentList from './KycDocumentList';
 
@@ -43,6 +43,10 @@ const KycReviewPanel = ({ vendor, currentUser, onClose, onStartReview, onDecide 
   const mayReview = canReviewKyc(currentUser);
   const isDecidable = ['submitted', 'under_review'].includes(vendor.kycStatus);
   const docs = vendor.kycDocuments || [];
+  const serviceLocations = vendor.serviceLocations || [];
+  // Older records hold a single free-text location instead of the structured list
+  const legacyLocation = vendor.serviceLocation || '';
+  const isOperations = vendor.kycType === 'operations';
   const materials = vendor.materials || [];
   const services = vendor.services || [];
   const history = [...(vendor.kycHistory || [])].reverse();
@@ -78,7 +82,7 @@ const KycReviewPanel = ({ vendor, currentUser, onClose, onStartReview, onDecide 
               <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${meta.badge}`}>{meta.label}</span>
             </div>
             <p className="text-xs text-gray-500 mt-0.5">
-              {vendor.companyName || '—'} · KYC via {kycSourceLabel(vendor.kycSource)}
+              {vendor.companyName || '—'} · {kycDepartmentLabel(vendor.kycType)}
             </p>
           </div>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 flex-shrink-0" aria-label="Close">
@@ -92,7 +96,10 @@ const KycReviewPanel = ({ vendor, currentUser, onClose, onStartReview, onDecide 
         <div className="px-5 py-2 border-b border-gray-100 flex gap-1 flex-wrap">
           <TabBtn id="details" active={tab === 'details'} onSelect={setTab}>Details</TabBtn>
           <TabBtn id="bank" active={tab === 'bank'} onSelect={setTab}>Bank &amp; Tax</TabBtn>
-          <TabBtn id="materials" count={materials.length + services.length} active={tab === 'materials'} onSelect={setTab}>Materials &amp; Services</TabBtn>
+          <TabBtn id="locations" count={serviceLocations.length} active={tab === 'locations'} onSelect={setTab}>Service Locations</TabBtn>
+          <TabBtn id="materials" count={materials.length + services.length} active={tab === 'materials'} onSelect={setTab}>
+            {isOperations ? 'Services' : 'Materials & Services'}
+          </TabBtn>
           <TabBtn id="docs" count={docs.length} active={tab === 'docs'} onSelect={setTab}>Documents</TabBtn>
           <TabBtn id="history" count={history.length} active={tab === 'history'} onSelect={setTab}>History</TabBtn>
         </div>
@@ -116,6 +123,24 @@ const KycReviewPanel = ({ vendor, currentUser, onClose, onStartReview, onDecide 
               {vendor.paymentTerms && <Row label="Payment Terms" value={vendor.paymentTerms} />}
               <Row label="Created By" value={vendor.createdByName || vendor.createdBy?.name} />
               <Row label="KYC Submitted" value={fmtDateTime(vendor.kycSubmittedAt)} />
+
+              {/* Company & statutory details, as submitted on the KYC form */}
+              {(vendor.companySize || vendor.shopEstablishmentNumber || vendor.iecCode
+                || vendor.pfNumber || vendor.esiNumber || vendor.numberOfVehicles != null) && (
+                <div className="pt-2 mt-2 border-t border-gray-100">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">
+                    Company &amp; Statutory
+                  </p>
+                  <Row label="Company Size" value={vendor.companySize && `${vendor.companySize} employees`} />
+                  <Row label="Shop Establishment No." value={vendor.shopEstablishmentNumber} mono />
+                  <Row label="IEC Code" value={vendor.iecCode} mono />
+                  <Row label="PF Number" value={vendor.pfNumber} mono />
+                  <Row label="ESI Number" value={vendor.esiNumber} mono />
+                  {vendor.numberOfVehicles != null && vendor.numberOfVehicles !== '' && (
+                    <Row label="Number of Vehicles" value={String(vendor.numberOfVehicles)} mono />
+                  )}
+                </div>
+              )}
               {vendor.kycAdditionalInfo && (
                 <div className="mt-3 bg-gray-50 rounded-lg p-3">
                   <p className="text-[11px] text-gray-500 mb-1">Additional information from vendor</p>
@@ -127,8 +152,27 @@ const KycReviewPanel = ({ vendor, currentUser, onClose, onStartReview, onDecide 
 
           {tab === 'bank' && (
             <div className="space-y-0.5">
-              <Row label="GST Number" value={vendor.gstNumber} mono />
+              <Row label="GST Number / URP" value={vendor.gstNumber} mono />
               <Row label="PAN" value={vendor.panNumber} mono />
+
+              {/* Additional state registrations */}
+              {(vendor.otherStateGst || []).length > 0 && (
+                <div className="py-2 border-b border-gray-100">
+                  <p className="text-[11px] text-gray-500 mb-1.5">
+                    GST in other states ({vendor.otherStateGst.length})
+                  </p>
+                  <ul className="space-y-1">
+                    {vendor.otherStateGst.map((g) => (
+                      <li key={g._id || `${g.state}-${g.gstNumber}`}
+                        className="flex items-center justify-between gap-2 bg-gray-50 rounded px-2 py-1">
+                        <span className="text-xs text-gray-700">{g.state}</span>
+                        <span className="text-[11px] font-mono text-gray-800">{g.gstNumber}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <Row label="Bank Name" value={vendor.bankName} />
               <Row label="Account Holder" value={vendor.accountHolderName} />
               <Row label="Account Number" value={vendor.accountNumber} mono />
@@ -139,6 +183,52 @@ const KycReviewPanel = ({ vendor, currentUser, onClose, onStartReview, onDecide 
                 </p>
               )}
             </div>
+          )}
+
+          {tab === 'locations' && (
+            serviceLocations.length ? (
+              <div className="space-y-2">
+                <p className="text-[11px] text-gray-500">
+                  Where this vendor provides services. A state with no cities listed means
+                  they cover the whole state.
+                </p>
+                <ul className="space-y-1.5">
+                  {serviceLocations.map((loc) => (
+                    <li key={loc._id || loc.state} className="border border-gray-200 rounded-lg p-2.5">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-xs font-semibold text-gray-800">{loc.state}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                          (loc.cities || []).length
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {(loc.cities || []).length
+                            ? `${loc.cities.length} ${loc.cities.length === 1 ? 'city' : 'cities'}`
+                            : 'Entire state'}
+                        </span>
+                      </div>
+                      {(loc.cities || []).length > 0 && (
+                        <ul className="flex flex-wrap gap-1">
+                          {loc.cities.map((c) => (
+                            <li key={c}
+                              className="px-2 py-0.5 rounded-md border border-blue-200 bg-blue-50
+                                         text-blue-800 text-[11px]">
+                              {c}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500 italic">
+                {legacyLocation
+                  ? `Service location: ${legacyLocation}`
+                  : 'No service locations were submitted.'}
+              </p>
+            )
           )}
 
           {tab === 'materials' && (

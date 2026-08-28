@@ -74,8 +74,27 @@ export const kycStatusMeta = (status) =>
 export const isAwaitingFinance = (vendor) =>
   ['submitted', 'under_review'].includes(vendor?.kycStatus);
 
+/**
+ * Which DEPARTMENT a KYC record belongs to — driven by the workflow the vendor
+ * was put through (`kycType`), not by whoever happened to click Generate.
+ * Finance and administrators generate both, so the generating user's own
+ * department does not identify the record. Anything without a kycType predates
+ * the Operations split and is Purchase.
+ */
+export const kycDepartmentLabel = (kycType) =>
+  ({ purchase: 'Purchase Department', operations: 'Operations Department' }[kycType]
+    || 'Purchase Department');
+
+// Short form for narrow table columns
+export const kycDepartmentShort = (kycType) =>
+  ({ purchase: 'Purchase', operations: 'Operations' }[kycType] || 'Purchase');
+
+/**
+ * Who generated the link. Kept separate from the department above because it
+ * answers a different question — it is audit information, not ownership.
+ */
 export const kycSourceLabel = (source) =>
-  ({ purchase: 'Purchase Dept.', finance: 'Finance' }[source] || '—');
+  ({ purchase: 'Purchase Dept.', finance: 'Finance', operations: 'Operations Dept.' }[source] || '—');
 
 // ---- KYC documents --------------------------------------------------------
 // Document types, file limits and validation live in config/kyc.js — the single

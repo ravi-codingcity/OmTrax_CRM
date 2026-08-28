@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useVendors } from '../../context/VendorContext';
 import CollapsibleSection from '../Common/CollapsibleSection';
 import {
-  kycStatusMeta, kycSourceLabel, isAwaitingFinance, fmtDate,
+  kycStatusMeta, kycDepartmentShort, isAwaitingFinance, fmtDate,
 } from '../../config/finance';
 
 /**
@@ -88,7 +88,7 @@ const VendorKycSummary = () => {
                 <tr className="text-left text-gray-500 border-b border-gray-200">
                   <th className="px-2 py-1.5 font-semibold">Vendor</th>
                   <th className="px-2 py-1.5 font-semibold">KYC Status</th>
-                  <th className="px-2 py-1.5 font-semibold">Source</th>
+                  <th className="px-2 py-1.5 font-semibold">Department</th>
                   <th className="px-2 py-1.5 font-semibold">Submitted</th>
                   <th className="px-2 py-1.5 font-semibold">Reviewed</th>
                 </tr>
@@ -112,7 +112,7 @@ const VendorKycSummary = () => {
                       <td className="px-2 py-1.5">
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${meta.badge}`}>{meta.label}</span>
                       </td>
-                      <td className="px-2 py-1.5 text-gray-600">{kycSourceLabel(v.kycSource)}</td>
+                      <td className="px-2 py-1.5 text-gray-600">{kycDepartmentShort(v.kycType)}</td>
                       <td className="px-2 py-1.5 text-gray-600">{fmtDate(v.kycSubmittedAt)}</td>
                       <td className="px-2 py-1.5 text-gray-600">{fmtDate(v.financeReview?.reviewedAt)}</td>
                     </tr>

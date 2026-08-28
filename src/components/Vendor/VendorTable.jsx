@@ -1,4 +1,4 @@
-import { kycStatusMeta, kycSourceLabel, isAwaitingFinance, fmtDate } from '../../config/finance';
+import { kycStatusMeta, kycDepartmentShort, isAwaitingFinance, fmtDate } from '../../config/finance';
 
 /**
  * Shared vendor register table, used by both Purchase and Finance.
@@ -44,7 +44,7 @@ const VendorTable = ({
                 <th className={`${headCls} text-center`}>Items</th>
                 <th className={`${headCls} text-center`}>Docs</th>
                 <th className={headCls}>KYC Status</th>
-                <th className={headCls}>KYC Source</th>
+                <th className={headCls}>KYC Department</th>
                 <th className={headCls}>Submitted</th>
                 <th className={headCls}>Finance Review</th>
                 {showActions && <th className={`${headCls} text-center`}>Actions</th>}
@@ -84,7 +84,7 @@ const VendorTable = ({
                         {meta.label}
                       </span>
                     </td>
-                    <td className={cellCls}>{kycSourceLabel(v.kycSource)}</td>
+                    <td className={cellCls}>{kycDepartmentShort(v.kycType)}</td>
                     <td className={cellCls}>{fmtDate(v.kycSubmittedAt)}</td>
                     <td className={cellCls}>
                       {v.financeReview?.decision ? (
@@ -162,7 +162,7 @@ const VendorTable = ({
               </div>
               <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
                 <div><span className="text-gray-400">Contact:</span> {v.contactPerson || '—'}</div>
-                <div><span className="text-gray-400">Source:</span> {kycSourceLabel(v.kycSource)}</div>
+                <div><span className="text-gray-400">Department:</span> {kycDepartmentShort(v.kycType)}</div>
                 <div><span className="text-gray-400">GST:</span> <span className="font-mono">{v.gstNumber || '—'}</span></div>
                 <div><span className="text-gray-400">Submitted:</span> {fmtDate(v.kycSubmittedAt)}</div>
                 <div><span className="text-gray-400">Materials:</span> {(v.materials || []).length + (v.services || []).length}</div>

@@ -9,12 +9,13 @@ import { kycTypesForUser, kycTypeLabel } from '../../config/departments';
  * before. Finance and administrators may generate either, so they pick first.
  * Adding a vendor manually never generates a link.
  */
-const KycRequestModal = ({ onClose, onGenerate, onMarkSent, user, defaultKycType }) => {
+const KycRequestModal = ({ onClose, onGenerate, onMarkSent, user }) => {
   const choices = kycTypesForUser(user);
-  // Pre-select the department being browsed when it is one of the options
-  const preset = choices.length === 1
-    ? choices[0].value
-    : (choices.some((c) => c.value === defaultKycType) ? defaultKycType : null);
+  // Skip the question ONLY when there is nothing to ask — a single option.
+  // Purchase and Operations users therefore keep their one-click flow, while
+  // anyone who can generate both (Finance, administrators) always chooses,
+  // rather than silently getting whichever department they happened to be in.
+  const preset = choices.length === 1 ? choices[0].value : null;
 
   const [kycType, setKycType] = useState(preset);
   const [result, setResult] = useState(null); // { kycLink, vendor }

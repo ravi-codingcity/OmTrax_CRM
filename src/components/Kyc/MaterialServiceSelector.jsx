@@ -132,6 +132,9 @@ const MaterialServiceSelector = ({
   materials, services, materialOptions = [], serviceOptions = [],
   onChangeMaterials, onChangeServices, disabled = false,
   showMaterials = true, showServices = true,
+  // Operations calls these "Operation Services"; Purchase calls them "Other
+  // Services". The server sends the right one with the form.
+  servicesLabel = 'Other Services',
 }) => {
   // What this form actually asks for decides when to nudge the vendor
   const nothingChosen =
@@ -161,7 +164,7 @@ const MaterialServiceSelector = ({
 
       {showServices && (
         <SelectionList
-          title="Other Services"
+          title={servicesLabel}
           tone="blue"
           hint="Logistics, labour and other professional services you provide."
           emptyText="No services selected yet."

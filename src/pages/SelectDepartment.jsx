@@ -31,6 +31,11 @@ const colorClasses = {
     icon: 'bg-slate-100 text-slate-600',
     btn: 'bg-slate-700 hover:bg-slate-800',
   },
+  cyan: {
+    ring: 'hover:border-cyan-500 hover:shadow-cyan-100',
+    icon: 'bg-cyan-100 text-cyan-600',
+    btn: 'bg-cyan-600 hover:bg-cyan-700',
+  },
 };
 
 const SelectDepartment = () => {
@@ -49,11 +54,15 @@ const SelectDepartment = () => {
 
   const handleSelect = (deptKey) => {
     setActiveDepartment(deptKey);
+    // Every department lands on its own home. Anything missing here falls back
+    // to the admin Leads dashboard, which is why Operations must be listed —
+    // it has no Leads section of its own.
     const home = {
       director: '/director/dashboard',
       hr: '/hr/dashboard',
       purchase: '/purchase/dashboard',
       finance: '/finance/dashboard',
+      operations: '/operations/dashboard',
     }[deptKey] || '/admin/dashboard';
     navigate(home, { replace: true });
   };

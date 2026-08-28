@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { kycStatusMeta, kycSourceLabel, fmtDateTime } from '../../config/finance';
+import { kycStatusMeta, kycDepartmentLabel, fmtDateTime } from '../../config/finance';
 
 /**
  * Generate and share a vendor's public KYC form link.
@@ -97,8 +97,8 @@ const KycLinkModal = ({ vendor, onClose, onGenerate, onMarkSent }) => {
               <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${meta.badge}`}>{meta.label}</span>
             </div>
             <div className="flex justify-between text-xs">
-              <span className="text-gray-500">Source</span>
-              <span className="font-medium text-gray-800">{kycSourceLabel(vendor.kycSource)}</span>
+              <span className="text-gray-500">Department</span>
+              <span className="font-medium text-gray-800">{kycDepartmentLabel(vendor.kycType)}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-gray-500">Link generated</span>

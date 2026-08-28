@@ -8,8 +8,9 @@ import VendorModal from '../../components/Vendor/VendorModal';
 import KycReviewPanel from '../../components/Vendor/KycReviewPanel';
 import KycRequestModal from '../../components/Vendor/KycRequestModal';
 import {
-  KYC_STATUSES, kycStatusMeta, canEditVendors, canGenerateKycLink, canReviewKyc, isCrmAdmin,
+  KYC_STATUSES, kycStatusMeta, canEditVendors, canReviewKyc, isCrmAdmin,
 } from '../../config/finance';
+import { kycTypesForUser } from '../../config/departments';
 
 /**
  * The shared vendor register. Purchase and Finance render the SAME data from
@@ -26,7 +27,9 @@ const VendorsPage = ({ department = 'purchase' }) => {
   // Two distinct permissions: editing the record, and requesting a KYC.
   // Finance can do the second but not the first.
   const mayEdit = canEditVendors(user);
-  const mayRequestKyc = canGenerateKycLink(user);
+  // May they generate EITHER form? Checking only 'purchase' would hide the
+  // button from Operations staff, who can generate the Operations form.
+  const mayRequestKyc = kycTypesForUser(user).length > 0;
   const mayReview = canReviewKyc(user);
   const isFinanceView = department === 'finance';
 
@@ -51,7 +54,7 @@ const VendorsPage = ({ department = 'purchase' }) => {
     const term = search.trim().toLowerCase();
     return vendors.filter((v) => {
       if (statusFilter && v.kycStatus !== statusFilter) return false;
-      if (sourceFilter && v.kycSource !== sourceFilter) return false;
+      if (sourceFilter && (v.kycType || 'purchase') !== sourceFilter) return false;
       if (!term) return true;
       return [v.vendorName, v.companyName, v.contactPerson, v.email, v.phone, v.gstNumber, v.panNumber]
         .some((f) => (f || '').toLowerCase().includes(term));
@@ -207,9 +210,9 @@ const VendorsPage = ({ department = 'purchase' }) => {
                 onChange={(e) => setSourceFilter(e.target.value)}
                 className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg bg-white min-w-[150px]"
               >
-                <option value="">All KYC sources</option>
-                <option value="purchase">Purchase Dept.</option>
-                <option value="finance">Finance</option>
+                <option value="">All departments</option>
+                <option value="purchase">Purchase Department</option>
+                <option value="operations">Operations Department</option>
               </select>
               {(search || statusFilter || sourceFilter) && (
                 <button
@@ -266,8 +269,6 @@ const VendorsPage = ({ department = 'purchase' }) => {
           onGenerate={createKycRequest}
           onMarkSent={markKycLinkSent}
           user={user}
-          // Browsing Operations offers the Operations form first
-          defaultKycType={department === 'operations' ? 'operations' : 'purchase'}
         />
       )}
 

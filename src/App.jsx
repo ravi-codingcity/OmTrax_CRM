@@ -34,6 +34,7 @@ import PurchaseOrders from './pages/Purchase/PurchaseOrders';
 import RateComparisons from './pages/Purchase/RateComparisons';
 import VendorsPage from './pages/shared/VendorsPage';
 import FinanceDashboard from './pages/finance/FinanceDashboard';
+import OperationsDashboard from './pages/operations/OperationsDashboard';
 import DirectorDashboard from './pages/director/DirectorDashboard';
 import KycForm from './pages/KycForm';
 
@@ -259,6 +260,14 @@ function App() {
               {/* Operations Department — its own vendor register and KYC
                   workflow. Shares VendorsPage; the backend scopes what it
                   returns to the Operations KYC type. */}
+              <Route
+                path="/operations/dashboard"
+                element={
+                  <ProtectedRoute requiredDepartment="operations">
+                    <OperationsDashboard />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/operations/vendors"
                 element={
