@@ -9,15 +9,28 @@ import PullToRefresh from '../../components/Common/PullToRefresh';
 import PurchaseOrderModal from '../../components/Purchase/PurchaseOrderModal';
 import { exportPurchaseOrderPdf } from '../../utils/pdfExport';
 import {
-  PO_STATUSES, poStatusMeta, inr, fmtDate, fmtDateTime,
-  canManagePurchaseOrders, isCrmAdmin,
+  PO_STATUSES, poStatusMeta, normalisePoStatus, inr, fmtDate, fmtDateTime, fmtEditStamp,
+  canManagePurchaseOrders, canEditPurchaseOrder, isCrmAdmin,
 } from '../../config/finance';
+
+// History labels. 'sent' / 'acknowledged' only appear on orders from before
+// POs stopped being sent through the CRM.
+const ACTIVITY_LABELS = {
+  created: 'Created', updated: 'Edited', generated: 'Generated', completed: 'Completed',
+  cancelled: 'Cancelled', sent: 'Sent (legacy)', acknowledged: 'Acknowledged (legacy)',
+};
+
+const EditIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+  </svg>
+);
 
 const PurchaseOrders = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { orders, loading, fetchOrders, fetchStats, fetchTermsSuggestions, getOrder, addOrder, updateOrder, setStatus, deleteOrder } = usePurchaseOrders();
+  const { orders, loading, fetchOrders, fetchStats, fetchTermsSuggestions, searchTermsSuggestions, getOrder, addOrder, updateOrder, setStatus, deleteOrder } = usePurchaseOrders();
   const { vendors, fetchVendors } = useVendors();
   const { items, fetchItems } = usePurchase();
 
@@ -30,7 +43,8 @@ const PurchaseOrders = () => {
   const [page, setPage] = useState(1);
   const perPage = 20;
 
-  const [modal, setModal] = useState({ open: false, mode: 'add', order: null, prefill: null });
+  // reopenDetail: the edit was started from the detail view, so return to it
+  const [modal, setModal] = useState({ open: false, mode: 'add', order: null, prefill: null, reopenDetail: false });
   const [detail, setDetail] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [message, setMessage] = useState('');
@@ -50,7 +64,7 @@ const PurchaseOrders = () => {
   useEffect(() => {
     const pf = location.state?.prefillFromComparison;
     if (pf) {
-      setModal({ open: true, mode: 'add', order: null, prefill: pf });
+      setModal({ open: true, mode: 'add', order: null, prefill: pf, reopenDetail: false });
       navigate(location.pathname, { replace: true, state: null });
     }
   }, [location, navigate]);
@@ -60,9 +74,9 @@ const PurchaseOrders = () => {
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return orders.filter((o) => {
-      if (statusFilter && o.status !== statusFilter) return false;
+      if (statusFilter && normalisePoStatus(o.status) !== statusFilter) return false;
       if (!term) return true;
-      return [o.poNumber, o.vendorName, o.createdByName]
+      return [o.poNumber, o.vendorName, o.createdByName, o.lastEditedByName]
         .some((f) => (f || '').toLowerCase().includes(term))
         || (o.items || []).some((l) => (l.itemName || '').toLowerCase().includes(term));
     });
@@ -73,11 +87,26 @@ const PurchaseOrders = () => {
   const pageItems = filtered.slice(start, start + perPage);
   useEffect(() => { setPage(1); }, [search, statusFilter]);
 
+  const closeModal = () => setModal({ open: false, mode: 'add', order: null, prefill: null, reopenDetail: false });
+
+  const openEdit = (po, reopenDetail = false) => {
+    setDetail(null);
+    setModal({ open: true, mode: 'edit', order: po, prefill: null, reopenDetail });
+  };
+
   const handleSubmit = async (payload) => {
-    const res = modal.mode === 'add'
-      ? await addOrder(payload)
-      : await updateOrder(modal.order._id, payload);
-    if (res.success) { flash(modal.mode === 'add' ? `Purchase order ${res.data.poNumber} created.` : 'Purchase order updated.'); loadData(); }
+    if (modal.mode === 'add') {
+      const res = await addOrder(payload);
+      if (res.success) { flash(`Purchase order ${res.data.poNumber} created.`); loadData(); }
+      return res;
+    }
+    const res = await updateOrder(modal.order._id, payload);
+    if (res.success) {
+      flash(res.unchanged ? 'No changes were made.' : `${res.data.poNumber} updated.`);
+      // Show the saved order, with its new edit stamp, if the edit began there
+      if (modal.reopenDetail) setDetail(res.data);
+      loadData();
+    }
     return res;
   };
 
@@ -86,9 +115,9 @@ const PurchaseOrders = () => {
     setDetail(full || po);
   };
 
-  const changeStatus = async (po, status, extra = {}) => {
+  const changeStatus = async (po, status) => {
     setBusy(true);
-    const res = await setStatus(po._id, { status, ...extra });
+    const res = await setStatus(po._id, { status });
     setBusy(false);
     if (res.success) {
       flash(`${po.poNumber} marked "${poStatusMeta(status).label}".`);
@@ -97,27 +126,8 @@ const PurchaseOrders = () => {
     } else flash(res.message);
   };
 
-  const shareByEmail = (po) => {
-    const subject = encodeURIComponent(`Purchase Order ${po.poNumber} — OmTrax`);
-    const lines = (po.items || [])
-      .map((l, i) => `${i + 1}. ${l.itemName} — ${l.quantity} ${l.unit || ''} @ ${inr(l.rate)} = ${inr(l.amount)}`)
-      .join('%0D%0A');
-    const body = encodeURIComponent(
-      `Dear ${po.vendorName},\n\nPlease find our purchase order below.\n\n` +
-      `PO Number: ${po.poNumber}\nPO Date: ${fmtDate(po.poDate)}\n` +
-      `${po.expectedDeliveryDate ? `Expected Delivery: ${fmtDate(po.expectedDeliveryDate)}\n` : ''}` +
-      `${po.deliveryLocation ? `Deliver To: ${po.deliveryLocation}\n` : ''}\nItems:\n`
-    ) + lines + encodeURIComponent(
-      `\n\nSubtotal: ${inr(po.subTotal)}\nTax: ${inr(po.taxAmount)}\nTotal: ${inr(po.totalAmount)}\n\n` +
-      `${po.paymentTerms ? `Payment Terms: ${po.paymentTerms}\n` : ''}` +
-      `${po.termsAndConditions ? `\nTerms:\n${po.termsAndConditions}\n` : ''}\nRegards,\nOmTrax`
-    );
-    window.open(`mailto:${po.vendorEmail || ''}?subject=${subject}&body=${body}`, '_blank');
-    changeStatus(po, 'sent', { sentTo: po.vendorEmail, sentMethod: 'email' });
-  };
-
-  // A PO detail response carries the populated vendor; the list rows do not, so
-  // refetch before generating so the PDF always has full vendor details.
+  // Always refetch before printing, so the PDF carries the latest saved edit
+  // and the fully populated vendor (list rows hold only part of it).
   const downloadPdf = async (po) => {
     setBusy(true);
     try {
@@ -143,12 +153,14 @@ const PurchaseOrders = () => {
     { label: 'Value', value: inr(s.totalValue), tone: 'text-emerald-600' },
     { label: 'Draft', value: s.draft || 0, tone: 'text-gray-500' },
     { label: 'Generated', value: s.generated || 0, tone: 'text-blue-600' },
-    { label: 'Sent', value: s.sent || 0, tone: 'text-indigo-600' },
     { label: 'Completed', value: s.completed || 0, tone: 'text-green-600' },
+    { label: 'Cancelled', value: s.cancelled || 0, tone: 'text-red-600' },
   ];
 
   const headCls = 'sticky top-0 z-10 bg-emerald-50 text-emerald-800 border-b border-r border-emerald-200 px-3 py-2.5 font-semibold text-left';
   const cellCls = 'border-b border-r border-gray-200 px-3 py-2.5 align-middle';
+
+  const detailStatus = detail ? normalisePoStatus(detail.status) : null;
 
   return (
     <MainLayout>
@@ -158,11 +170,11 @@ const PurchaseOrders = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Purchase Orders</h1>
-              <p className="text-gray-500 text-xs sm:text-sm mt-1">Raise, track and share purchase orders with vendors</p>
+              <p className="text-gray-500 text-xs sm:text-sm mt-1">Raise, correct and download purchase orders for printing on letterhead</p>
             </div>
             {mayManage && (
               <button
-                onClick={() => setModal({ open: true, mode: 'add', order: null, prefill: null })}
+                onClick={() => setModal({ open: true, mode: 'add', order: null, prefill: null, reopenDetail: false })}
                 className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 flex items-center justify-center w-full sm:w-auto"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -228,7 +240,7 @@ const PurchaseOrders = () => {
             <>
               <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse min-w-[900px] text-xs">
+                  <table className="w-full border-collapse min-w-[960px] text-xs">
                     <thead>
                       <tr>
                         <th className={headCls}>PO Number</th>
@@ -237,7 +249,7 @@ const PurchaseOrders = () => {
                         <th className={headCls}>Items</th>
                         <th className={`${headCls} text-right`}>Amount</th>
                         <th className={headCls}>Created By</th>
-                        <th className={headCls}>Sent</th>
+                        <th className={headCls}>Last Edited</th>
                         <th className={`${headCls} text-center`}>Actions</th>
                       </tr>
                     </thead>
@@ -255,12 +267,22 @@ const PurchaseOrders = () => {
                               <p className="text-gray-500 truncate max-w-[160px]">{(po.items || [])[0]?.itemName}</p>
                             </td>
                             <td className={`${cellCls} text-right font-semibold text-gray-800`}>{inr(po.totalAmount)}</td>
-                            <td className={cellCls}>{po.createdByName || po.createdBy?.name || '—'}</td>
-                            <td className={cellCls}>{po.sentAt ? fmtDate(po.sentAt) : '—'}</td>
+                            <td className={cellCls}>
+                              <p>{po.createdByName || po.createdBy?.name || '—'}</p>
+                              <p className="text-gray-500">{fmtDate(po.createdAt)}</p>
+                            </td>
+                            <td className={cellCls}>
+                              {po.lastEditedAt ? (
+                                <>
+                                  <p className="text-gray-800">{po.lastEditedByName || '—'}</p>
+                                  <p className="text-gray-500 whitespace-nowrap">{fmtEditStamp(po.lastEditedAt)}</p>
+                                </>
+                              ) : <span className="text-gray-400">—</span>}
+                            </td>
                             <td className={`${cellCls} text-center whitespace-nowrap`}>
                               <div className="flex items-center justify-center gap-1">
-                                <button onClick={() => downloadPdf(po)} title="Download PO as PDF"
-                                  className="p-1.5 rounded-md text-emerald-700 hover:bg-emerald-100">
+                                <button onClick={() => downloadPdf(po)} title="Download PO as PDF" disabled={busy}
+                                  className="p-1.5 rounded-md text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                   </svg>
@@ -272,19 +294,11 @@ const PurchaseOrders = () => {
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                   </svg>
                                 </button>
-                                {mayManage && ['draft', 'generated'].includes(po.status) && (
-                                  <>
-                                    <button onClick={() => setModal({ open: true, mode: 'edit', order: po, prefill: null })} title="Edit"
-                                      className="p-1.5 rounded-md text-blue-600 hover:bg-blue-100">
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                      </svg>
-                                    </button>
-                                    <button onClick={() => shareByEmail(po)} title="Send to vendor" disabled={busy}
-                                      className="px-2 py-1 rounded-md text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50">
-                                      Send
-                                    </button>
-                                  </>
+                                {canEditPurchaseOrder(user, po) && (
+                                  <button onClick={() => openEdit(po)} title="Edit"
+                                    className="p-1.5 rounded-md text-blue-600 hover:bg-blue-100">
+                                    <EditIcon />
+                                  </button>
                                 )}
                                 {isCrmAdmin(user) && (
                                   <button onClick={() => setDeleteTarget(po)} title="Delete"
@@ -317,15 +331,17 @@ const PurchaseOrders = () => {
                         <div><span className="text-gray-400">Date:</span> {fmtDate(po.poDate)}</div>
                         <div><span className="text-gray-400">Items:</span> {(po.items || []).length}</div>
                         <div className="col-span-2"><span className="text-gray-400">Amount:</span> <strong className="text-gray-800">{inr(po.totalAmount)}</strong></div>
+                        {po.lastEditedAt && (
+                          <div className="col-span-2">
+                            <span className="text-gray-400">Last Edited:</span> {po.lastEditedByName || '—'}, {fmtEditStamp(po.lastEditedAt)}
+                          </div>
+                        )}
                       </div>
                       <div className="mt-2.5 flex gap-1.5">
                         <button onClick={() => openDetail(po)} className="flex-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-md py-1.5">View</button>
-                        <button onClick={() => downloadPdf(po)} className="flex-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-md py-1.5">PDF</button>
-                        {mayManage && ['draft', 'generated'].includes(po.status) && (
-                          <>
-                            <button onClick={() => setModal({ open: true, mode: 'edit', order: po, prefill: null })} className="flex-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md py-1.5">Edit</button>
-                            <button onClick={() => shareByEmail(po)} className="flex-1 text-xs font-semibold text-white bg-emerald-600 rounded-md py-1.5">Send</button>
-                          </>
+                        <button onClick={() => downloadPdf(po)} disabled={busy} className="flex-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-md py-1.5 disabled:opacity-50">PDF</button>
+                        {canEditPurchaseOrder(user, po) && (
+                          <button onClick={() => openEdit(po)} className="flex-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md py-1.5">Edit</button>
                         )}
                       </div>
                     </div>
@@ -356,7 +372,8 @@ const PurchaseOrders = () => {
           items={items}
           prefill={modal.prefill}
           termsSuggestions={termsSuggestions}
-          onClose={() => setModal({ open: false, mode: 'add', order: null, prefill: null })}
+          searchTermsSuggestions={searchTermsSuggestions}
+          onClose={closeModal}
           onSubmit={handleSubmit}
         />
       )}
@@ -417,13 +434,22 @@ const PurchaseOrders = () => {
                 <div><span className="text-gray-500">Delivery:</span> {detail.deliveryLocation || '—'}</div>
                 <div><span className="text-gray-500">Expected:</span> {fmtDate(detail.expectedDeliveryDate)}</div>
                 <div><span className="text-gray-500">Payment:</span> {detail.paymentTerms || '—'}</div>
-                <div><span className="text-gray-500">Created by:</span> {detail.createdByName || '—'}</div>
-                {detail.sentAt && (
-                  <div className="sm:col-span-2">
-                    <span className="text-gray-500">Sent:</span> {fmtDateTime(detail.sentAt)} to {detail.sentTo || '—'} via {detail.sentMethod || '—'}
-                  </div>
+                {detail.rateComparisonNumber && (
+                  <div><span className="text-gray-500">Rate Comparison:</span> <span className="font-mono">{detail.rateComparisonNumber}</span></div>
                 )}
+                <div className="sm:col-span-2">
+                  <span className="text-gray-500">Created by:</span> {detail.createdByName || detail.createdBy?.name || '—'}
+                  {detail.createdAt && <span className="text-gray-500">, {fmtEditStamp(detail.createdAt)}</span>}
+                </div>
               </div>
+
+              {/* Latest edit — shown only when the order has actually been edited */}
+              {detail.lastEditedAt && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-blue-50 border border-blue-100 rounded-lg p-3">
+                  <div><span className="text-blue-700/80">Last Edited By:</span> <strong className="text-blue-900">{detail.lastEditedByName || '—'}</strong></div>
+                  <div><span className="text-blue-700/80">Last Edited:</span> <strong className="text-blue-900">{fmtEditStamp(detail.lastEditedAt)}</strong></div>
+                </div>
+              )}
 
               {(detail.terms?.length || detail.termsAndConditions) && (
                 <div className="text-xs">
@@ -447,51 +473,51 @@ const PurchaseOrders = () => {
                     {[...detail.activity].reverse().map((a, i) => (
                       <div key={i} className="flex items-baseline gap-2 text-[11px]">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-                        <span className="font-medium text-gray-700 capitalize">{a.action}</span>
+                        <span className="font-medium text-gray-700">{ACTIVITY_LABELS[a.action] || a.action}</span>
                         <span className="text-gray-500">{a.byName}</span>
-                        <span className="text-gray-400 ml-auto">{fmtDateTime(a.at)}</span>
+                        {a.action === 'updated' && a.note && <span className="text-gray-400 truncate">· {a.note}</span>}
+                        <span className="text-gray-400 ml-auto whitespace-nowrap">{fmtDateTime(a.at)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {mayManage && (
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
-                  {['draft', 'generated'].includes(detail.status) && (
-                    <button onClick={() => shareByEmail(detail)} disabled={busy}
-                      className="px-3 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50">
-                      Send to Vendor
-                    </button>
-                  )}
-                  {detail.status === 'sent' && (
-                    <button onClick={() => changeStatus(detail, 'acknowledged')} disabled={busy}
-                      className="px-3 py-2 text-xs font-medium text-teal-700 bg-teal-50 rounded-lg hover:bg-teal-100 disabled:opacity-50">
-                      Mark Acknowledged
-                    </button>
-                  )}
-                  {['sent', 'acknowledged'].includes(detail.status) && (
-                    <button onClick={() => changeStatus(detail, 'completed')} disabled={busy}
-                      className="px-3 py-2 text-xs font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 disabled:opacity-50">
-                      Mark Completed
-                    </button>
-                  )}
-                  {!['completed', 'cancelled'].includes(detail.status) && (
-                    <button onClick={() => changeStatus(detail, 'cancelled')} disabled={busy}
-                      className="px-3 py-2 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50">
-                      Cancel PO
-                    </button>
-                  )}
-                  <button onClick={() => exportPurchaseOrderPdf(detail)}
-                    className="px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100">
-                    Download PDF
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
+                {canEditPurchaseOrder(user, detail) && (
+                  <button onClick={() => openEdit(detail, true)} disabled={busy}
+                    className="px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 flex items-center gap-1">
+                    <EditIcon /> Edit
                   </button>
-                  <button onClick={() => setDetail(null)}
-                    className="ml-auto px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
-                    Close
+                )}
+                {mayManage && detailStatus === 'draft' && (
+                  <button onClick={() => changeStatus(detail, 'generated')} disabled={busy}
+                    className="px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50">
+                    Generate PO
                   </button>
-                </div>
-              )}
+                )}
+                {mayManage && detailStatus === 'generated' && (
+                  <button onClick={() => changeStatus(detail, 'completed')} disabled={busy}
+                    className="px-3 py-2 text-xs font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 disabled:opacity-50">
+                    Mark Completed
+                  </button>
+                )}
+                {mayManage && ['draft', 'generated'].includes(detailStatus) && (
+                  <button onClick={() => changeStatus(detail, 'cancelled')} disabled={busy}
+                    className="px-3 py-2 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50">
+                    Cancel PO
+                  </button>
+                )}
+                {/* Refetches first, so the PDF always reflects the latest saved edit */}
+                <button onClick={() => downloadPdf(detail)} disabled={busy}
+                  className="px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 disabled:opacity-50">
+                  Download PDF
+                </button>
+                <button onClick={() => setDetail(null)}
+                  className="ml-auto px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

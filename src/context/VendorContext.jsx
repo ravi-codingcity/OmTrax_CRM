@@ -109,6 +109,20 @@ export const VendorProvider = ({ children }) => {
     }
   }, []);
 
+  // Read the KYC link ALREADY saved against a vendor. Never mints a new one,
+  // so an existing link the vendor is holding stays valid.
+  const getSavedKycLink = useCallback(async (id) => {
+    try {
+      const res = await vendorAPI.getSavedKycLink(id);
+      return { success: true, data: res.data.data };
+    } catch (err) {
+      return {
+        success: false,
+        message: err.response?.data?.message || 'Could not load the saved KYC link',
+      };
+    }
+  }, []);
+
   // Generate (or regenerate) the vendor's public KYC link.
   // Returns { success, data: { kycLink, ... }, requiresConfirmation }
   const generateKycLink = useCallback(async (id, opts = {}) => {
@@ -168,6 +182,7 @@ export const VendorProvider = ({ children }) => {
         createKycRequest,
         updateVendor,
         deleteVendor,
+        getSavedKycLink,
         generateKycLink,
         markKycLinkSent,
         startKycReview,

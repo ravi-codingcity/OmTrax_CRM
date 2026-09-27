@@ -14,6 +14,7 @@ import {
   KYC_DOCUMENT_FIELDS, MAX_FILE_MB,
   URP_VALUE, isUrp, isValidGst, documentsFor, OTHER_SERVICES,
   INDIAN_STATES, CITIES_BY_STATE, COMPANY_SIZES, MAX_OTHER_STATE_GST, formConfigFor,
+  documentFieldsFor, VEHICLE_SERVICE,
 } from '../config/kyc';
 import omtrax_logo from '../assets/OmTrax.png';
 
@@ -67,14 +68,16 @@ const Notice = ({ tone = 'gray', title, children }) => {
   );
 };
 
-const Section = ({ title, hint, step, children }) => (
+const Section = ({ title, hint, step, required = false, children }) => (
   <section className="border border-gray-200 rounded-lg overflow-hidden">
     <div className="bg-gray-50/80 border-b border-gray-200 px-3 py-2 flex items-baseline gap-2">
       {step && (
         <span className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-600 text-white text-[10px] font-bold
                          flex items-center justify-center leading-none">{step}</span>
       )}
-      <h2 className="text-xs font-semibold text-gray-700">{title}</h2>
+      <h2 className="text-xs font-semibold text-gray-700">
+        {title}{required && <span className="text-red-500 font-bold ml-0.5">*</span>}
+      </h2>
       {hint && <p className="text-[11px] text-gray-400 truncate hidden sm:block">· {hint}</p>}
     </div>
     <div className="p-3">
@@ -144,7 +147,7 @@ const KycForm = () => {
     bankName: '', accountHolderName: '', accountNumber: '', ifscCode: '',
     kycAdditionalInfo: '',
     // Optional statutory details
-    esiNumber: '', pfNumber: '', shopEstablishmentNumber: '', iecCode: '',
+    esiNumber: '', pfNumber: '', shopEstablishmentNumber: '',
     companySize: '', serviceLocation: '',
     // Operations only
     numberOfVehicles: '',
@@ -161,10 +164,10 @@ const KycForm = () => {
   // Extra state registrations. Hidden until the vendor says they have them.
   const [hasOtherStateGst, setHasOtherStateGst] = useState(false);
   const [otherStateGst, setOtherStateGst] = useState([]);
-  // PF and ESI sit behind "do you have one?" — the input only appears on yes,
-  // and neither is ever required.
-  const [hasPf, setHasPf] = useState(false);
-  const [hasEsi, setHasEsi] = useState(false);
+  // Shop Establishment and IEC sit behind "do you have one?" — the input only
+  // appears on yes, and neither is ever required. (PF and ESI moved to the
+  // Documents section and are now collected as uploads.)
+  const [hasShop, setHasShop] = useState(false);
   const [files, setFiles] = useState({});
   const [fileErrors, setFileErrors] = useState({});
   const [errors, setErrors] = useState([]);
@@ -181,7 +184,11 @@ const KycForm = () => {
       const res = await kycAPI.getForm(token);
       const d = res.data.data;
       setUploadsEnabled(d.uploadsEnabled !== false);
-      if (Array.isArray(d.documents) && d.documents.length) setDocFields(d.documents);
+      // The server list is authoritative; the local set is the fallback and must
+      // still respect which slots this form type offers.
+      setDocFields(Array.isArray(d.documents) && d.documents.length
+        ? d.documents
+        : documentFieldsFor(d.kycType));
       // Which sections to show comes from the server, so the vendor can never
       // be shown a section their form does not collect.
       setFormCfg({
@@ -209,7 +216,6 @@ const KycForm = () => {
         esiNumber: d.esiNumber || '',
         pfNumber: d.pfNumber || '',
         shopEstablishmentNumber: d.shopEstablishmentNumber || '',
-        iecCode: d.iecCode || '',
         companySize: d.companySize || '',
         serviceLocation: d.serviceLocation || '',
         numberOfVehicles: d.numberOfVehicles === 0 || d.numberOfVehicles ? String(d.numberOfVehicles) : '',
@@ -232,8 +238,7 @@ const KycForm = () => {
       if (Array.isArray(d.companySizeOptions) && d.companySizeOptions.length) {
         setCompanySizeOptions(d.companySizeOptions);
       }
-      if (d.pfNumber) setHasPf(true);
-      if (d.esiNumber) setHasEsi(true);
+      if (d.shopEstablishmentNumber) setHasShop(true);
       if (Array.isArray(d.otherStateGst) && d.otherStateGst.length) {
         setOtherStateGst(d.otherStateGst.map((g) => ({ state: g.state || '', gstNumber: g.gstNumber || '' })));
         setHasOtherStateGst(true);
@@ -260,6 +265,13 @@ const KycForm = () => {
 
   const setField = (name, value) => setForm((p) => ({ ...p, [name]: value }));
 
+  // Dropping Transportation drops the vehicle count with it, so a hidden field
+  // can never be submitted.
+  const changeServices = (next) => {
+    setServices(next);
+    if (!next.includes(VEHICLE_SERVICE)) setField('numberOfVehicles', '');
+  };
+
   // --- Other-state GST rows ---
   const addStateGst = () =>
     setOtherStateGst((p) => (p.length >= MAX_OTHER_STATE_GST ? p : [...p, { state: '', gstNumber: '' }]));
@@ -267,13 +279,9 @@ const KycForm = () => {
   const setStateGst = (i, key, value) =>
     setOtherStateGst((p) => p.map((row, x) => (x === i ? { ...row, [key]: value } : row)));
 
-  const togglePf = (checked) => {
-    setHasPf(checked);
-    if (!checked) setField('pfNumber', '');
-  };
-  const toggleEsi = (checked) => {
-    setHasEsi(checked);
-    if (!checked) setField('esiNumber', '');
+  const toggleShop = (checked) => {
+    setHasShop(checked);
+    if (!checked) setField('shopEstablishmentNumber', '');
   };
 
   // Unticking the box discards the rows, so a hidden section can never submit
@@ -312,6 +320,11 @@ const KycForm = () => {
     () => shownDocs.filter((d) => TEMPLATE_META[d.field]),
     [shownDocs]
   );
+  // The vehicle count only makes sense for a transporter, so it appears only
+  // once Transportation is among the chosen services. Mirrored by the backend,
+  // which clears the value when Transportation is not selected.
+  const showVehicles = formCfg.collectsVehicles && services.includes(VEHICLE_SERVICE);
+
   const fileCount = useMemo(() => Object.keys(files).length, [files]);
 
   const handleSubmit = async (e) => {
@@ -341,6 +354,11 @@ const KycForm = () => {
     }
     if (formCfg.collectsServices && !services.length) {
       problems.push('Select at least one service you provide');
+    }
+
+    // At least one state is required on both forms; cities remain optional
+    if (!serviceLocations.some((l) => (l.state || '').trim())) {
+      problems.push('Add at least one Service Location (State / UT)');
     }
 
     const seenLocationStates = new Set();
@@ -383,7 +401,11 @@ const KycForm = () => {
     setStage(fileCount ? `Uploading ${fileCount} document${fileCount === 1 ? '' : 's'}...` : 'Submitting...');
 
     const fd = new FormData();
-    Object.entries(form).forEach(([k, v]) => fd.append(k, v));
+    Object.entries(form).forEach(([k, v]) => {
+      // Never send a value whose field is hidden
+      if (k === 'numberOfVehicles' && !showVehicles) return fd.append(k, '');
+      return fd.append(k, v);
+    });
     // Multipart cannot carry a real array, so the lists travel as JSON.
     // Materials and services are kept separate all the way into MongoDB.
     fd.append('materials', JSON.stringify(formCfg.collectsMaterials ? materials.map((m) => ({ materialName: m })) : []));
@@ -395,8 +417,7 @@ const KycForm = () => {
         .filter((l) => (l.state || '').trim())
         .map((l) => ({ state: l.state.trim(), cities: (l.cities || []).map((c) => c.trim()).filter(Boolean) }))
     ));
-    fd.append('hasPfNumber', String(hasPf));
-    fd.append('hasEsiNumber', String(hasEsi));
+    fd.append('hasShopEstablishment', String(hasShop));
     fd.append('otherStateGst', JSON.stringify(
       hasOtherStateGst
         ? otherStateGst
@@ -518,94 +539,107 @@ const KycForm = () => {
               <Field name="address" title="Company Address" placeholder="Full registered address" required className="sm:col-span-2 lg:col-span-3" {...f} />
               <Field name="email" title="Email ID" type="email" placeholder="you@company.com" required {...f} />
               <Field name="phone" title="Phone Number" placeholder="10-digit mobile" required {...f} />
-              <div className="sm:col-span-2 lg:col-span-1">
-                <label className={LABEL_CLS}>
-                  GST Number / URP <span className="text-red-500">*</span>
-                </label>
-                <input
-                  value={form.gstNumber}
-                  onChange={(e) => setField('gstNumber', e.target.value)}
-                  className={INPUT_CLS}
-                  placeholder="07AABCU9603R1ZM or URP"
-                />
-                <p className="text-[11px] text-gray-400 mt-0.5">
-                  Enter your 15-character GST number. Not GST registered? Type{' '}
-                  <button
-                    type="button"
-                    onClick={() => setField('gstNumber', URP_VALUE)}
-                    className="font-semibold text-amber-700 underline underline-offset-2"
-                  >
-                    URP
-                  </button>{' '}
-                  &mdash; Unregistered Proprietorship.
-                </p>
+              <div className="sm:col-span-2 lg:col-span-3">
+                <div className="border border-amber-200 bg-amber-50/50 rounded-lg p-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-start">
+                    <div>
+                      <label className={LABEL_CLS}>
+                        GST Number / URP <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        value={form.gstNumber}
+                        onChange={(e) => setField('gstNumber', e.target.value)}
+                        className={INPUT_CLS}
+                        placeholder="07AABCU9603R1ZM or URP"
+                      />
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        15-character GST number. Not registered? Type{' '}
+                        <button
+                          type="button"
+                          onClick={() => setField('gstNumber', URP_VALUE)}
+                          className="font-semibold text-amber-700 underline underline-offset-2"
+                        >
+                          URP
+                        </button>{' '}
+                        &mdash; Unregistered Proprietorship.
+                      </p>
+                    </div>
+
+                    {/* Sits beside the GST field so it cannot be missed */}
+                    <div className="sm:pt-5">
+                      <label className={`flex items-start gap-2 cursor-pointer select-none rounded-lg border p-2
+                                         transition-colors duration-200 ${
+                        hasOtherStateGst ? 'border-amber-400 bg-white' : 'border-amber-200 bg-white/70 hover:border-amber-300'
+                      }`}>
+                        <input
+                          type="checkbox"
+                          checked={hasOtherStateGst}
+                          onChange={(e) => toggleOtherStateGst(e.target.checked)}
+                          disabled={submitting}
+                          className="h-4 w-4 mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                        />
+                        <span>
+                          <span className="block text-sm font-medium text-gray-800">
+                            Do you have GST registration in other states?
+                          </span>
+                          <span className="block text-[11px] text-gray-500">
+                            Tick to add each additional state and its GST number.
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {hasOtherStateGst && (
+                    <div className="mt-2.5 space-y-2 animate-[fadeIn_200ms_ease-out]">
+                      {otherStateGst.map((row, i) => (
+                        <div key={i} className="flex flex-col sm:flex-row gap-2">
+                          <select
+                            value={row.state}
+                            onChange={(e) => setStateGst(i, 'state', e.target.value)}
+                            className={`${INPUT_CLS} sm:flex-1`}
+                            disabled={submitting}
+                          >
+                            <option value="">Select state / UT</option>
+                            {stateOptions.map((st) => (
+                              <option key={st} value={st}>{st}</option>
+                            ))}
+                          </select>
+                          <input
+                            value={row.gstNumber}
+                            onChange={(e) => setStateGst(i, 'gstNumber', e.target.value)}
+                            className={`${INPUT_CLS} sm:flex-1`}
+                            placeholder="GST number for that state"
+                            disabled={submitting}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeStateGst(i)}
+                            disabled={submitting}
+                            className="px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg border border-red-200 disabled:opacity-50"
+                            aria-label={`Remove other state GST ${i + 1}`}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={addStateGst}
+                        disabled={submitting || otherStateGst.length >= MAX_OTHER_STATE_GST}
+                        className="text-xs font-semibold text-amber-700 hover:text-amber-800 disabled:opacity-50"
+                      >
+                        + Add another state
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
               <Field name="panNumber" title="PAN Card Number" placeholder="ABCDE1234F" required hint="10 characters" {...f} />
               <Field name="contactPerson" title="Contact Person" placeholder="Primary contact" {...f} />
               <Field name="city" title="City" placeholder="City" {...f} />
               <Field name="state" title="State" placeholder="State" {...f} />
               <Field name="pincode" title="Pincode" placeholder="6-digit" {...f} />
-
-              <div className="sm:col-span-2 lg:col-span-3 border-t border-gray-100 pt-2.5">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={hasOtherStateGst}
-                    onChange={(e) => toggleOtherStateGst(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                  />
-                  <span className="text-sm text-gray-700">
-                    Do you have GST registration in other states?
-                  </span>
-                </label>
-
-                {hasOtherStateGst && (
-                  <div className="mt-3 space-y-2">
-                    <p className="text-[11px] text-gray-500">
-                      Add each additional state and the GST number registered there.
-                    </p>
-                    {otherStateGst.map((row, i) => (
-                      <div key={i} className="flex flex-col sm:flex-row gap-2">
-                        <select
-                          value={row.state}
-                          onChange={(e) => setStateGst(i, 'state', e.target.value)}
-                          className={`${INPUT_CLS} sm:flex-1`}
-                          disabled={submitting}
-                        >
-                          <option value="">Select state / UT</option>
-                          {stateOptions.map((st) => (
-                            <option key={st} value={st}>{st}</option>
-                          ))}
-                        </select>
-                        <input
-                          value={row.gstNumber}
-                          onChange={(e) => setStateGst(i, 'gstNumber', e.target.value)}
-                          className={`${INPUT_CLS} sm:flex-1`}
-                          placeholder="GST number for that state"
-                          disabled={submitting}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeStateGst(i)}
-                          disabled={submitting}
-                          className="px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg border border-red-200 disabled:opacity-50"
-                          aria-label={`Remove other state GST ${i + 1}`}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={addStateGst}
-                      disabled={submitting || otherStateGst.length >= MAX_OTHER_STATE_GST}
-                      className="text-xs font-semibold text-amber-700 hover:text-amber-800 disabled:opacity-50"
-                    >
-                      + Add another state
-                    </button>
-                  </div>
-                )}
-              </div>
             </div>
           </Section>
 
@@ -615,10 +649,9 @@ const KycForm = () => {
             hint="All optional — fill in whatever applies"
           >
             <div className="space-y-2.5">
-              {/* Shop Establishment / IEC / Company Size on one row */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <Field name="shopEstablishmentNumber" title="Shop Establishment Number" placeholder="Shop & Establishment registration" {...f} />
-                <Field name="iecCode" title="IEC Code" placeholder="Import Export Code" {...f} />
+              {/* Company Size and Shop Establishment share one row. The Shop
+                  field stays behind its checkbox and expands in place. */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-start">
                 <div>
                   <label className={LABEL_CLS}>Company Size</label>
                   <select
@@ -633,37 +666,22 @@ const KycForm = () => {
                     ))}
                   </select>
                 </div>
-              </div>
 
-              {/* PF and ESI share one row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <RevealCheckbox label="Do you have PF Number?" checked={hasPf} onChange={togglePf} disabled={submitting}>
-                  <Field name="pfNumber" title="PF Number" placeholder="Provident Fund number" {...f} />
-                </RevealCheckbox>
-
-                <RevealCheckbox label="Do you have ESI Number?" checked={hasEsi} onChange={toggleEsi} disabled={submitting}>
-                  <Field name="esiNumber" title="ESI Number" placeholder="ESI registration number" {...f} />
+                <RevealCheckbox
+                  label="Do you have Shop Establishment Number?"
+                  checked={hasShop} onChange={toggleShop} disabled={submitting}
+                >
+                  <Field name="shopEstablishmentNumber" title="Shop Establishment Number" placeholder="Shop & Establishment registration" {...f} />
                 </RevealCheckbox>
               </div>
-
-              {formCfg.collectsVehicles && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  <Field
-                    name="numberOfVehicles"
-                    title="Number of Vehicles"
-                    type="number"
-                    placeholder="e.g. 12"
-                    {...f}
-                  />
-                </div>
-              )}
             </div>
           </Section>
 
           <Section
             title="Service Locations"
             step="3"
-            hint="States you cover — cities optional"
+            required
+            hint="At least one State — cities optional"
           >
             <ServiceLocationSelector
               locations={serviceLocations}
@@ -678,10 +696,11 @@ const KycForm = () => {
           <Section
             title={formCfg.collectsMaterials ? 'Material Details' : formCfg.servicesLabel}
             step="4"
+            required
             hint={
               formCfg.collectsMaterials
-                ? 'Choose every material you supply'
-                : 'Choose every service you provide'
+                ? 'At least one material you supply'
+                : 'At least one service you provide'
             }
           >
             <MaterialServiceSelector
@@ -690,12 +709,29 @@ const KycForm = () => {
               materialOptions={materialOptions}
               serviceOptions={serviceOptions}
               onChangeMaterials={setMaterials}
-              onChangeServices={setServices}
+              onChangeServices={changeServices}
               showMaterials={formCfg.collectsMaterials}
               showServices={formCfg.collectsServices}
               servicesLabel={formCfg.servicesLabel}
               disabled={submitting}
             />
+
+            {/* Belongs with the services it depends on, not with the statutory
+                details: it appears only once Transportation is chosen. */}
+            {showVehicles && (
+              <div className="mt-2.5 pt-2.5 border-t border-gray-100 animate-[fadeIn_200ms_ease-out]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <Field
+                    name="numberOfVehicles"
+                    title="Number of Vehicles"
+                    type="number"
+                    placeholder="e.g. 12"
+                    hint="Shown because you provide Transportation"
+                    {...f}
+                  />
+                </div>
+              </div>
+            )}
           </Section>
 
           <Section

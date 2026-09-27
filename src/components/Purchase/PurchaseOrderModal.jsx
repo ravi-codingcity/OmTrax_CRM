@@ -13,11 +13,15 @@ const emptyLine = () => ({ itemName: '', quantity: '', unit: '', rate: '' });
  * Totals are previewed live here, but the backend recomputes them on save —
  * the server figure is always authoritative.
  */
-const PurchaseOrderModal = ({ mode = 'add', order = null, vendors = [], items = [], prefill = null, termsSuggestions = [], onClose, onSubmit }) => {
+const PurchaseOrderModal = ({ mode = 'add', order = null, vendors = [], items = [], prefill = null, termsSuggestions = [], searchTermsSuggestions, onClose, onSubmit }) => {
   const isEdit = mode === 'edit';
   // When a PO is raised from an approved rate comparison, the vendor, rate and
   // quantity come from the quotation the Director approved.
   const fromComparison = prefill?.rateComparison ? prefill : null;
+  // An existing PO raised from a comparison keeps the Director-approved vendor
+  const editingApprovedPo = isEdit && !!order?.rateComparison;
+  const vendorLocked = !!fromComparison || editingApprovedPo;
+  const isDraft = isEdit && order?.status === 'draft';
 
   const [form, setForm] = useState({
     vendor: order?.vendor?._id || order?.vendor || prefill?.vendor || '',
@@ -112,9 +116,11 @@ const PurchaseOrderModal = ({ mode = 'add', order = null, vendors = [], items = 
           unit: l.unit.trim(),
           rate: Number(l.rate) || 0,
         })),
-      status,
+      ...(status ? { status } : {}),
       ...(fromComparison ? { rateComparison: fromComparison.rateComparison } : {}),
     };
+    // The vendor of a PO raised from an approved comparison is fixed
+    if (editingApprovedPo) delete payload.vendor;
 
     const res = await onSubmit(payload);
     setSubmitting(false);
@@ -134,7 +140,9 @@ const PurchaseOrderModal = ({ mode = 'add', order = null, vendors = [], items = 
               {isEdit ? `Edit ${order?.poNumber || 'Purchase Order'}` : 'New Purchase Order'}
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              {isEdit ? 'Changes are blocked once the PO has been sent.' : 'The PO number is assigned automatically on save.'}
+              {isEdit
+                ? 'Correct any mistake and save. The PO number and creation details stay the same; the edit is recorded with your name and the time.'
+                : 'The PO number is assigned automatically on save.'}
             </p>
           </div>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600" aria-label="Close">
@@ -155,6 +163,22 @@ const PurchaseOrderModal = ({ mode = 'add', order = null, vendors = [], items = 
             </div>
           )}
 
+          {fromComparison?.gstByItem && (
+            <div className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-2.5 text-xs text-amber-900">
+              The approved quotation has different GST rates per item
+              ({fromComparison.gstByItem.map((g) => `${g.itemName} ${g.taxPercent}%`).join(', ')}).
+              A purchase order applies one GST rate — {fromComparison.taxPercent}% has been filled in; check it before saving.
+            </div>
+          )}
+
+          {editingApprovedPo && (
+            <div className="bg-emerald-50 border border-emerald-300 rounded-lg px-3 py-2.5 text-xs text-emerald-900">
+              Raised from approved rate comparison{' '}
+              <strong className="font-mono">{order.rateComparisonNumber || order.rateComparison?.comparisonNumber}</strong>.
+              The vendor approved by the Director cannot be changed.
+            </div>
+          )}
+
           {/* Vendor + dates */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">
@@ -162,8 +186,8 @@ const PurchaseOrderModal = ({ mode = 'add', order = null, vendors = [], items = 
               <select
                 value={form.vendor}
                 onChange={(e) => setField('vendor', e.target.value)}
-                disabled={!!fromComparison}
-                className={`${inputCls} ${errors.vendor ? 'border-red-300 bg-red-50' : ''} ${fromComparison ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+                disabled={vendorLocked}
+                className={`${inputCls} ${errors.vendor ? 'border-red-300 bg-red-50' : ''} ${vendorLocked ? 'bg-gray-50 cursor-not-allowed' : ''}`}
               >
                 <option value="">Select a vendor</option>
                 {activeVendors.map((v) => (
@@ -299,6 +323,7 @@ const PurchaseOrderModal = ({ mode = 'add', order = null, vendors = [], items = 
               terms={terms}
               onChange={setTerms}
               suggestions={termsSuggestions}
+              searchSuggestions={searchTermsSuggestions}
               disabled={submitting}
             />
           </div>
@@ -308,14 +333,31 @@ const PurchaseOrderModal = ({ mode = 'add', order = null, vendors = [], items = 
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
               Cancel
             </button>
-            <button type="button" onClick={() => submit('draft')} disabled={submitting}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50">
-              Save as Draft
-            </button>
-            <button type="button" onClick={() => submit('generated')} disabled={submitting}
-              className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50">
-              {submitting ? 'Saving...' : 'Generate PO'}
-            </button>
+            {isEdit ? (
+              <>
+                {isDraft && (
+                  <button type="button" onClick={() => submit('generated')} disabled={submitting}
+                    className="px-4 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 disabled:opacity-50">
+                    Save &amp; Generate PO
+                  </button>
+                )}
+                <button type="button" onClick={() => submit()} disabled={submitting}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50">
+                  {submitting ? 'Saving...' : 'Save Changes'}
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" onClick={() => submit('draft')} disabled={submitting}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50">
+                  Save as Draft
+                </button>
+                <button type="button" onClick={() => submit('generated')} disabled={submitting}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50">
+                  {submitting ? 'Saving...' : 'Generate PO'}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

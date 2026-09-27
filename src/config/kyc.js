@@ -6,7 +6,7 @@
 
 export const MAX_FILE_MB = 1;
 export const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
-export const MAX_FILES = 14;
+export const MAX_FILES = 16;
 
 export const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'pdf', 'xls', 'xlsx'];
 export const ALLOWED_LABEL = 'JPG, JPEG, PDF, XLS or XLSX';
@@ -87,12 +87,16 @@ export const KYC_DOCUMENT_FIELDS = [
   { field: 'panCard', label: 'PAN Card', required: true },
   { field: 'gstCertificate', label: 'GST Certificate', required: true, requiresGst: true },
   { field: 'cancelledCheque', label: 'Cancelled Cheque', required: true },
-  { field: 'incorporationCertificate', label: 'Incorporation Certificate (CIN)', required: false },
-  { field: 'aadhaarCard', label: 'Aadhaar Card', required: false },
+  // One upload covers either proof of incorporation or the proprietor's
+  // Aadhaar, depending on how the vendor is constituted. Mandatory.
+  { field: 'cinAadhaar', label: 'CIN / Aadhaar Card', required: true },
   { field: 'msmeCertificate', label: 'MSME Certificate', required: false },
   { field: 'balanceSheet', label: 'Balance Sheet', required: false },
   { field: 'profitLoss', label: 'Profit & Loss (P&L) Statement', required: false },
   { field: 'agreementUpload', label: 'Agreement', required: false },
+  // PF and ESI are collected as documents rather than typed numbers
+  { field: 'pfDocument', label: 'PF Document', required: false },
+  { field: 'esiDocument', label: 'ESI Document', required: false },
   // Template documents — download, fill offline, upload the completed copy
   { field: 'generalAgreement', label: 'General Agreement Form', required: false, isTemplate: true, acceptsWord: true },
   {
@@ -238,17 +242,39 @@ export const KYC_FORM_CONFIG = {
 export const formConfigFor = (kycType) =>
   KYC_FORM_CONFIG[kycType] || KYC_FORM_CONFIG.purchase;
 
+// Mirrors DOCS_EXCLUDED_BY_TYPE in the backend's kycConstants.js. The server is
+// the authority — it sends the real list with the form — but this keeps the
+// fallback honest if that fetch ever fails.
+const DOCS_EXCLUDED_BY_TYPE = {
+  purchase: ['tdsDeclaration'],
+  operations: [],
+};
+
+export const documentFieldsFor = (kycType) => {
+  const excluded = DOCS_EXCLUDED_BY_TYPE[kycType] || DOCS_EXCLUDED_BY_TYPE.purchase;
+  return excluded.length
+    ? KYC_DOCUMENT_FIELDS.filter((d) => !excluded.includes(d.field))
+    : KYC_DOCUMENT_FIELDS;
+};
+
+// The service whose presence reveals the vehicle count on the Operations form
+export const VEHICLE_SERVICE = 'Transportation';
+
 export const docTypeLabel = (docType) =>
   ({
     pan_card: 'PAN Card',
     gst_certificate: 'GST Certificate',
     cancelled_cheque: 'Cancelled Cheque',
-    incorporation_certificate: 'Incorporation Certificate (CIN)',
+    cin_aadhaar: 'CIN / Aadhaar Card',
+    // Collected separately before they were combined
+    incorporation_certificate: 'Certificate of Incorporation',
     aadhaar_card: 'Aadhaar Card',
     msme_certificate: 'MSME Certificate',
     balance_sheet: 'Balance Sheet',
     profit_loss: 'Profit & Loss (P&L) Statement',
     agreement: 'Agreement',
+    pf_document: 'PF Document',
+    esi_document: 'ESI Document',
     general_agreement: 'General Agreement Form',
     tds_declaration: 'TDS Declaration – Non-Deduction of TDS (Transporter), Tax Year 2026-27',
     // Legacy types — no longer collected, but old submissions still carry them

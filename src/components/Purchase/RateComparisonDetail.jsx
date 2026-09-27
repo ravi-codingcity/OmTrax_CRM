@@ -3,7 +3,7 @@ import { inr, fmtDate, fmtDateTime } from '../../config/finance';
 import { exportRateComparisonPdf } from '../../utils/pdfExport';
 import {
   rcStatusMeta, canApproveRateComparisons, canEditComparison, canRaisePo,
-  DIRECTOR_QUICK_REMARKS, MIN_QUOTATIONS_TO_SUBMIT,
+  DIRECTOR_QUICK_REMARKS, MIN_QUOTATIONS_TO_SUBMIT, comparisonView, lineFor, quantityLabel,
 } from '../../config/rateComparison';
 
 const Stat = ({ label, value, tone = 'text-gray-800' }) => (
@@ -17,8 +17,9 @@ const Stat = ({ label, value, tone = 'text-gray-800' }) => (
  * Side-by-side rate comparison, and the Director's decision controls.
  *
  * The Purchase Team sees the same view read-only. The comparison table is the
- * point of the screen: the cheapest quote and the recommended one are marked so
- * the Director can judge at a glance whether the recommendation makes sense.
+ * point of the screen: items run down the side and vendors across the top, the
+ * cheapest quote for each item and the recommended vendor are marked, so the
+ * Director can judge at a glance whether the recommendation makes sense.
  */
 const RateComparisonDetail = ({
   comparison, currentUser, onClose, onDecide, onSubmit, onEdit, onCreatePo,
@@ -33,10 +34,18 @@ const RateComparisonDetail = ({
   const mayDecide = canApproveRateComparisons(currentUser);
   const isPending = rc.status === 'pending_approval';
   const summary = rc.summary;
-  const quotes = rc.quotations || [];
+  const { items, quotations: quotes } = comparisonView(rc);
+  const multi = items.length > 1;
   const history = [...(rc.history || [])].reverse();
 
-  const lowestTotal = quotes.length ? Math.min(...quotes.map((q) => q.totalAmount || Infinity)) : 0;
+  // Cheapest quote for each item, among the vendors that quoted it
+  const lowestLine = Object.fromEntries(items.map((it) => {
+    const offers = quotes.map((q) => lineFor(q, it._id)).filter(Boolean);
+    return [String(it._id), offers.length > 1 ? Math.min(...offers.map((l) => l.totalAmount ?? Infinity)) : null];
+  }));
+  const quotedCount = (q) => items.filter((it) => lineFor(q, it._id)).length;
+  const selectedQuote = quotes.find((q) => q.isSelected);
+  const selectedMissing = selectedQuote ? items.filter((it) => !lineFor(selectedQuote, it._id)) : [];
 
   const act = async (kind) => {
     if (kind !== 'approved' && !remarks.trim()) {
@@ -78,7 +87,9 @@ const RateComparisonDetail = ({
               )}
             </div>
             <p className="text-xs text-gray-500 mt-0.5 truncate">
-              {rc.materialName} · {rc.requiredQuantity} {rc.unit} · {fmtDate(rc.comparisonDate)}
+              {multi
+                ? `${items.length} items · ${fmtDate(rc.comparisonDate)}`
+                : `${rc.materialName} · ${quantityLabel(rc)} · ${fmtDate(rc.comparisonDate)}`}
             </p>
           </div>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 flex-shrink-0" aria-label="Close">
@@ -97,9 +108,10 @@ const RateComparisonDetail = ({
 
           {/* At-a-glance */}
           {summary && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className={`grid grid-cols-2 gap-2 ${multi ? 'sm:grid-cols-5' : 'sm:grid-cols-4'}`}>
+              {multi && <Stat label="Items" value={items.length} />}
               <Stat label="Vendors compared" value={summary.vendorCount} />
-              <Stat label="Lowest quote" value={inr(summary.lowest.totalAmount)} tone="text-emerald-600" />
+              <Stat label={multi ? 'Lowest total quote' : 'Lowest quote'} value={inr(summary.lowest.totalAmount)} tone="text-emerald-600" />
               <Stat label="Price spread" value={inr(summary.spread)} tone="text-gray-700" />
               <Stat
                 label={summary.selected ? (summary.selected.isLowest ? 'Recommended (lowest)' : 'Recommended') : 'Recommended'}
@@ -109,63 +121,101 @@ const RateComparisonDetail = ({
             </div>
           )}
 
-          {/* The Director's key question: is the recommendation the cheapest? */}
-          {summary?.selected && !summary.selected.isLowest && (
-            <div className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-2.5 text-xs text-amber-900">
-              <strong>{summary.selected.vendorName}</strong> is recommended at {inr(summary.selected.totalAmount)} —
-              that is <strong>{inr(summary.selected.premiumOverLowest)} more</strong> than the lowest quote
-              from {summary.lowest.vendorName}. The Purchase Team's reasoning is below.
+          {/* The recommended vendor must be able to supply everything */}
+          {selectedQuote && selectedMissing.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-xs text-red-800">
+              <strong>{selectedQuote.vendorName}</strong> is recommended but has not quoted{' '}
+              <strong>{selectedMissing.map((it) => it.itemName).join(', ')}</strong>.
+              The recommended vendor must quote every item before this can be submitted.
             </div>
           )}
 
-          {/* Side-by-side comparison */}
+          {/* The Director's key question: is the recommendation the cheapest? */}
+          {summary?.selected && !summary.selected.isLowest && summary.selected.premiumOverLowest > 0 && selectedMissing.length === 0 && (
+            <div className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-2.5 text-xs text-amber-900">
+              <strong>{summary.selected.vendorName}</strong> is recommended at {inr(summary.selected.totalAmount)} —
+              that is <strong>{inr(summary.selected.premiumOverLowest)} more</strong> than the lowest
+              {multi ? ' total quote for all items' : ' quote'} from {summary.lowest.vendorName}. The Purchase Team's reasoning is below.
+            </div>
+          )}
+
+          {/* Side-by-side comparison: items down the side, vendors across */}
           <div>
-            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Vendor Comparison</h3>
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
+              {multi ? 'Item-wise Vendor Comparison' : 'Vendor Comparison'}
+            </h3>
             <div className="overflow-x-auto border border-gray-200 rounded-lg">
-              <table className="w-full text-xs min-w-[600px]">
+              <table className="w-full text-xs border-collapse" style={{ minWidth: `${220 + quotes.length * 170}px` }}>
                 <thead className="bg-gray-50">
-                  <tr className="text-left text-gray-600">
-                    <th className="px-3 py-2 font-semibold">Vendor</th>
-                    <th className="px-3 py-2 font-semibold text-right">Rate</th>
-                    <th className="px-3 py-2 font-semibold text-right">Tax</th>
-                    <th className="px-3 py-2 font-semibold text-right">Total</th>
-                    <th className="px-3 py-2 font-semibold text-center">Delivery Time</th>
-                    <th className="px-3 py-2 font-semibold">Payment</th>
+                  <tr className="text-left text-gray-600 align-bottom">
+                    <th className="px-3 py-2 font-semibold sticky left-0 bg-gray-50 z-[1] min-w-[180px]">Item</th>
+                    {quotes.map((q) => (
+                      <th key={q._id} className={`px-3 py-2 font-semibold border-l border-gray-200 ${q.isSelected ? 'bg-emerald-50' : ''}`}>
+                        <span className="text-gray-800">{q.vendorName}</span>
+                        {q.isSelected && (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700 whitespace-nowrap">Recommended</span>
+                        )}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {quotes.map((q) => {
-                    const isLowest = q.totalAmount === lowestTotal;
-                    return (
-                      <tr key={q._id}
-                        className={`border-t border-gray-100 ${q.isSelected ? 'bg-emerald-50/60' : ''}`}>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-1.5">
-                            {q.isSelected && (
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" title="Recommended" />
+                  {items.map((it) => (
+                    <tr key={String(it._id)} className="border-t border-gray-100 align-top">
+                      <td className="px-3 py-2 sticky left-0 bg-white z-[1]">
+                        <p className="font-medium text-gray-800">{it.itemName}</p>
+                        <p className="text-[11px] text-gray-500">{it.requiredQuantity} {it.unit}</p>
+                      </td>
+                      {quotes.map((q) => {
+                        const line = lineFor(q, it._id);
+                        const low = lowestLine[String(it._id)];
+                        const isLowest = line && low != null && line.totalAmount === low;
+                        return (
+                          <td key={q._id} className={`px-3 py-2 border-l border-gray-100 ${q.isSelected ? 'bg-emerald-50/60' : ''}`}>
+                            {line ? (
+                              <div className="space-y-0.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-gray-700">{inr(line.quotedRate)} <span className="text-gray-400">/ {it.unit || 'unit'}</span></span>
+                                  {isLowest && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">Lowest</span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-gray-500">GST {line.taxPercent || 0}% · {inr(line.taxAmount)}</p>
+                                <p className={`font-bold ${isLowest ? 'text-emerald-700' : 'text-gray-800'}`}>{inr(line.totalAmount)}</p>
+                                <p className="text-[11px] text-gray-600"><span className="text-gray-400">Delivery:</span> {line.deliveryTime || '—'}</p>
+                                <p className="text-[11px] text-gray-600"><span className="text-gray-400">Payment:</span> {line.paymentTerms || '—'}</p>
+                              </div>
+                            ) : (
+                              <span className="text-[11px] italic text-gray-400">Not quoted</span>
                             )}
-                            <span className="font-medium text-gray-800">{q.vendorName}</span>
-                          </div>
-                          <div className="flex gap-1 mt-0.5">
-                            {q.isSelected && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700">Recommended</span>
-                            )}
-                            {isLowest && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">Lowest</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-right text-gray-700">{inr(q.quotedRate)}</td>
-                        <td className="px-3 py-2 text-right text-gray-600">{q.taxPercent}%<br /><span className="text-[10px]">{inr(q.taxAmount)}</span></td>
-                        <td className={`px-3 py-2 text-right font-bold ${isLowest ? 'text-emerald-700' : 'text-gray-800'}`}>
-                          {inr(q.totalAmount)}
-                        </td>
-                        <td className="px-3 py-2 text-center text-gray-600">{q.deliveryTime || '—'}</td>
-                        <td className="px-3 py-2 text-gray-600">{q.paymentTerms || '—'}</td>
-                      </tr>
-                    );
-                  })}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
                 </tbody>
+                {multi && (
+                  <tfoot className="bg-gray-50">
+                    <tr className="border-t border-gray-200 align-top">
+                      <td className="px-3 py-2 font-semibold text-gray-700 sticky left-0 bg-gray-50 z-[1]">Vendor total</td>
+                      {quotes.map((q) => {
+                        const isLowestTotal = summary?.lowest?.quotation && String(summary.lowest.quotation) === String(q._id) && quotes.length > 1;
+                        const count = quotedCount(q);
+                        return (
+                          <td key={q._id} className={`px-3 py-2 border-l border-gray-200 ${q.isSelected ? 'bg-emerald-50' : ''}`}>
+                            <p className={`font-bold ${isLowestTotal ? 'text-emerald-700' : 'text-gray-800'}`}>{inr(q.totalAmount)}</p>
+                            <p className={`text-[11px] ${count === items.length ? 'text-gray-500' : 'text-amber-700'}`}>
+                              {count} of {items.length} items quoted
+                            </p>
+                            {isLowestTotal && (
+                              <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">Lowest total</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </div>

@@ -189,7 +189,7 @@ const OperationsDashboard = () => {
                           className="border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer"
                         >
                           <td className="py-1.5 pr-2 font-medium text-gray-800 truncate max-w-[10rem]">
-                            {v.nameIsPlaceholder ? '—' : v.vendorName}
+                            {v.nameIsPlaceholder ? (v.kycRequestName || '—') : v.vendorName}
                           </td>
                           <td className="py-1.5 px-2 text-gray-600 hidden sm:table-cell truncate max-w-[12rem]">
                             {v.companyName || '—'}

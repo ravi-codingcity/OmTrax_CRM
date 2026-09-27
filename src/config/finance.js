@@ -103,17 +103,26 @@ export const kycSourceLabel = (source) =>
 
 // ---- Purchase Orders ------------------------------------------------------
 
-export const PO_STATUSES = ['draft', 'generated', 'sent', 'acknowledged', 'completed', 'cancelled'];
+// POs are not sent through the CRM: Purchase downloads the PDF, prints it on
+// letterhead and dispatches it by hand. There is therefore no "sent" status.
+export const PO_STATUSES = ['draft', 'generated', 'completed', 'cancelled'];
+
+// Orders saved under the retired send workflow still read as generated
+const LEGACY_SENT_STATUSES = ['sent', 'acknowledged'];
+export const normalisePoStatus = (status) => (LEGACY_SENT_STATUSES.includes(status) ? 'generated' : status);
 
 export const poStatusMeta = (status) =>
   ({
     draft: { label: 'Draft', badge: 'bg-gray-100 text-gray-600' },
     generated: { label: 'Generated', badge: 'bg-blue-100 text-blue-700' },
-    sent: { label: 'Sent to Vendor', badge: 'bg-indigo-100 text-indigo-700' },
-    acknowledged: { label: 'Acknowledged', badge: 'bg-teal-100 text-teal-700' },
     completed: { label: 'Completed', badge: 'bg-green-100 text-green-700' },
     cancelled: { label: 'Cancelled', badge: 'bg-red-100 text-red-700' },
-  }[status] || { label: status || 'Unknown', badge: 'bg-gray-100 text-gray-600' });
+  }[normalisePoStatus(status)] || { label: status || 'Unknown', badge: 'bg-gray-100 text-gray-600' });
+
+// A PO can be corrected while it is a draft or generated. Completed and
+// cancelled orders are closed records. Mirrors the backend rule.
+export const canEditPurchaseOrder = (user, po) =>
+  canManagePurchaseOrders(user) && ['draft', 'generated'].includes(normalisePoStatus(po?.status));
 
 // ---- Shared formatting ----------------------------------------------------
 
@@ -126,6 +135,18 @@ export const fmtDate = (d) => {
   return isNaN(x.getTime())
     ? '—'
     : `${String(x.getDate()).padStart(2, '0')}-${String(x.getMonth() + 1).padStart(2, '0')}-${x.getFullYear()}`;
+};
+
+// "14-09-2026 08:44 PM" — the edit stamp shown on purchase orders. Rendered in
+// the viewer's local time; the stored value is an unchanged UTC timestamp.
+export const fmtEditStamp = (d) => {
+  if (!d) return '—';
+  const x = new Date(d);
+  if (isNaN(x.getTime())) return '—';
+  const h = x.getHours();
+  const hh = String(h % 12 || 12).padStart(2, '0');
+  const mm = String(x.getMinutes()).padStart(2, '0');
+  return `${fmtDate(x)} ${hh}:${mm} ${h < 12 ? 'AM' : 'PM'}`;
 };
 
 export const fmtDateTime = (d) => {

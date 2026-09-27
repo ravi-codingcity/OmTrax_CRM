@@ -7,8 +7,8 @@ import MainLayout from '../../components/Layout/MainLayout';
 import PullToRefresh from '../../components/Common/PullToRefresh';
 import CollapsibleSection from '../../components/Common/CollapsibleSection';
 import RateComparisonDetail from '../../components/Purchase/RateComparisonDetail';
-import { inr, fmtDate } from '../../config/finance';
-import { rcStatusMeta, isAwaitingDirector } from '../../config/rateComparison';
+import { inr, fmtDate, fmtEditStamp } from '../../config/finance';
+import { rcStatusMeta, isAwaitingDirector, quantityLabel } from '../../config/rateComparison';
 import { exportPurchaseOrderPdf, exportRateComparisonPdf } from '../../utils/pdfExport';
 
 /**
@@ -162,7 +162,7 @@ const DirectorDashboard = () => {
                           {rc.materialName}
                         </p>
                         <p className="text-xs text-gray-500 truncate">
-                          {rc.requiredQuantity} {rc.unit} · {(rc.quotations || []).length} vendors ·
+                          {quantityLabel(rc)} · {(rc.quotations || []).length} vendors ·
                           {' '}recommending {rc.selectedVendorName || '—'}
                           {selected ? ` at ${inr(selected.totalAmount)}` : ''}
                           {' '}· {fmtDate(rc.submittedAt)}
@@ -194,7 +194,7 @@ const DirectorDashboard = () => {
           <CollapsibleSection title="Recent Purchase Orders" badge={orders.length} defaultOpen>
             {recentOrders.length ? (
               <div className="overflow-x-auto -mx-1">
-                <table className="w-full text-xs min-w-[560px]">
+                <table className="w-full text-xs min-w-[720px]">
                   <thead>
                     <tr className="text-left text-gray-500 border-b border-gray-200">
                       <th className="px-2 py-1.5 font-semibold">PO Number</th>
@@ -202,6 +202,7 @@ const DirectorDashboard = () => {
                       <th className="px-2 py-1.5 font-semibold">Vendor</th>
                       <th className="px-2 py-1.5 font-semibold">From Comparison</th>
                       <th className="px-2 py-1.5 font-semibold text-right">Amount</th>
+                      <th className="px-2 py-1.5 font-semibold">Last Edited</th>
                       <th className="px-2 py-1.5 font-semibold text-center">PDF</th>
                     </tr>
                   </thead>
@@ -215,6 +216,14 @@ const DirectorDashboard = () => {
                           {po.rateComparisonNumber || '—'}
                         </td>
                         <td className="px-2 py-1.5 text-right font-semibold text-gray-800">{inr(po.totalAmount)}</td>
+                        <td className="px-2 py-1.5 text-gray-600">
+                          {po.lastEditedAt ? (
+                            <>
+                              <p className="text-gray-700">{po.lastEditedByName || '—'}</p>
+                              <p className="text-[11px] text-gray-500 whitespace-nowrap">{fmtEditStamp(po.lastEditedAt)}</p>
+                            </>
+                          ) : <span className="text-gray-400">Not edited</span>}
+                        </td>
                         <td className="px-2 py-1.5 text-center">
                           <button
                             onClick={() => downloadPo(po)}

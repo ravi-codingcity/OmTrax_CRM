@@ -1,5 +1,10 @@
 import { kycStatusMeta, kycDepartmentShort, isAwaitingFinance, fmtDate } from '../../config/finance';
 
+// A name the team entered when generating the KYC link, not yet replaced by
+// the Legal Name the vendor submits
+const isTemporaryName = (v) => !!(v.nameIsPlaceholder && v.kycRequestName);
+const TEMP_NAME_NOTE = 'Entered at link generation · replaced when the vendor submits KYC';
+
 /**
  * Shared vendor register table, used by both Purchase and Finance.
  *
@@ -10,11 +15,12 @@ const VendorTable = ({
   vendors,
   onView = null,
   onEdit = null,
+  onCopyLink = null,
   onReview = null,
   onDelete = null,
   emptyMessage = 'No vendors found',
 }) => {
-  const showActions = !!(onView || onEdit || onReview || onDelete);
+  const showActions = !!(onView || onEdit || onReview || onDelete || onCopyLink);
 
   if (!vendors.length) {
     return (
@@ -66,6 +72,7 @@ const VendorTable = ({
                         <div className="min-w-0">
                           <p className="font-semibold text-gray-800 truncate">{v.vendorName}</p>
                           {v.companyName && <p className="text-gray-500 truncate">{v.companyName}</p>}
+                          {isTemporaryName(v) && <p className="text-[10px] text-gray-400 truncate">{TEMP_NAME_NOTE}</p>}
                         </div>
                       </div>
                     </td>
@@ -116,6 +123,14 @@ const VendorTable = ({
                               Review
                             </button>
                           )}
+                          {onCopyLink && v.hasKycLink && (
+                            <button onClick={() => onCopyLink(v)} title="Copy the saved KYC link"
+                              className="p-1.5 rounded-md text-amber-700 hover:bg-amber-100">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                            </button>
+                          )}
                           {onEdit && (
                             <button onClick={() => onEdit(v)} title="Edit vendor"
                               className="p-1.5 rounded-md text-blue-600 hover:bg-blue-100">
@@ -155,6 +170,7 @@ const VendorTable = ({
                 <div className="min-w-0">
                   <p className="font-semibold text-sm text-gray-800 truncate">{v.vendorName}</p>
                   {v.companyName && <p className="text-xs text-gray-500 truncate">{v.companyName}</p>}
+                  {isTemporaryName(v) && <p className="text-[10px] text-gray-400 truncate">{TEMP_NAME_NOTE}</p>}
                 </div>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-semibold flex-shrink-0 ${meta.badge}`}>
                   {meta.label}

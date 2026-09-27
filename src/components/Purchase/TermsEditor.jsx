@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 
 const INPUT = 'w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500';
 
@@ -39,6 +39,27 @@ const PATH = {
   plus: 'M12 4v16m8-8H4',
 };
 
+// Same rule the backend uses: case, repeated spaces and trailing punctuation do
+// not make two conditions different.
+const termKey = (t) => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim().replace(/[\s.,;:]+$/, '');
+
+const MIN_QUERY = 2;
+const SEARCH_DELAY_MS = 200;
+
+// Bold the part of a suggestion that matches what was typed
+const Highlight = ({ text, query }) => {
+  const q = query.trim().replace(/\s+/g, ' ');
+  const at = q ? text.toLowerCase().indexOf(q.toLowerCase()) : -1;
+  if (at === -1) return text;
+  return (
+    <>
+      {text.slice(0, at)}
+      <strong className="font-semibold text-emerald-800">{text.slice(at, at + q.length)}</strong>
+      {text.slice(at + q.length)}
+    </>
+  );
+};
+
 /**
  * Point-wise Terms & Conditions for a Purchase Order.
  *
@@ -46,16 +67,64 @@ const PATH = {
  * up and down. Terms used on previous purchase orders appear as one-tap
  * suggestions, and anything already on this PO is filtered out of them so the
  * same condition cannot be added twice.
+ *
+ * While a new condition is typed, terms saved on existing purchase orders that
+ * match it are searched on the server (`searchSuggestions`) and offered in a
+ * dropdown. Without a search function the loaded `suggestions` are filtered
+ * locally instead.
  */
-const TermsEditor = ({ terms, onChange, suggestions = [], disabled = false }) => {
+const TermsEditor = ({ terms, onChange, suggestions = [], searchSuggestions, disabled = false }) => {
   const [draft, setDraft] = useState('');
   const [editingIndex, setEditingIndex] = useState(null);
   const [editingText, setEditingText] = useState('');
   const [error, setError] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // Type-ahead state
+  const [matches, setMatches] = useState({ query: '', items: [] });
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [activeMatch, setActiveMatch] = useState(-1);
+  const searchSeq = useRef(0);
+
   const isDuplicate = (text, ignoreIndex = -1) =>
-    terms.some((t, i) => i !== ignoreIndex && t.trim().toLowerCase() === text.trim().toLowerCase());
+    terms.some((t, i) => i !== ignoreIndex && termKey(t) === termKey(text));
+
+  const query = draft.trim();
+  const searching = query.length >= MIN_QUERY;
+
+  // Look up saved terms matching the draft, a moment after typing pauses. Only
+  // the newest response is kept, so a slow earlier reply cannot overwrite it.
+  useEffect(() => {
+    if (!searching || disabled) return undefined;
+    const seq = ++searchSeq.current;
+    const timer = setTimeout(async () => {
+      let items = [];
+      try {
+        if (searchSuggestions) {
+          items = await searchSuggestions(query);
+        } else {
+          const q = termKey(query);
+          items = suggestions.filter((s) => termKey(s.text || s).includes(q));
+        }
+      } catch {
+        items = [];
+      }
+      if (seq === searchSeq.current) {
+        setMatches({ query, items: Array.isArray(items) ? items : [] });
+        setActiveMatch(-1);
+      }
+    }, SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [query, searching, disabled, searchSuggestions, suggestions]);
+
+  // Matches for the current draft, minus anything already on this PO
+  const visibleMatches = useMemo(() => {
+    if (!searching || matches.query !== query) return [];
+    const used = new Set(terms.map(termKey));
+    return matches.items.filter((s) => !used.has(termKey(s.text || s))).slice(0, 8);
+  }, [matches, query, searching, terms]);
+
+  const showDropdown = dropdownOpen && visibleMatches.length > 0;
 
   const add = (text) => {
     const value = String(text ?? draft).trim();
@@ -70,6 +139,26 @@ const TermsEditor = ({ terms, onChange, suggestions = [], disabled = false }) =>
     onChange([...terms, value]);
     setDraft('');
     setError('');
+    setDropdownOpen(false);
+    setActiveMatch(-1);
+  };
+
+  const onDraftKeyDown = (e) => {
+    if (showDropdown && e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveMatch((i) => (i + 1) % visibleMatches.length);
+    } else if (showDropdown && e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveMatch((i) => (i <= 0 ? visibleMatches.length - 1 : i - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (showDropdown && activeMatch >= 0) add(String(visibleMatches[activeMatch].text || visibleMatches[activeMatch]));
+      else add();
+    } else if (e.key === 'Escape' && showDropdown) {
+      e.preventDefault();
+      e.stopPropagation();
+      setDropdownOpen(false);
+    }
   };
 
   const remove = (idx) => {
@@ -168,14 +257,58 @@ const TermsEditor = ({ terms, onChange, suggestions = [], disabled = false }) =>
 
       {/* Add a new point */}
       <div className="flex gap-2">
-        <input
-          value={draft}
-          onChange={(e) => { setDraft(e.target.value); if (error) setError(''); }}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-          disabled={disabled}
-          className={`${INPUT} flex-1`}
-          placeholder={terms.length ? 'Add another condition...' : 'e.g. Payment will be made within 30 days'}
-        />
+        <div className="relative flex-1">
+          <input
+            value={draft}
+            onChange={(e) => { setDraft(e.target.value); setDropdownOpen(true); if (error) setError(''); }}
+            onKeyDown={onDraftKeyDown}
+            onFocus={() => setDropdownOpen(true)}
+            onBlur={() => setDropdownOpen(false)}
+            disabled={disabled}
+            className={INPUT}
+            placeholder={terms.length ? 'Add another condition...' : 'Start typing to see previously used terms'}
+            role="combobox"
+            aria-expanded={showDropdown}
+            aria-autocomplete="list"
+            aria-controls="po-terms-suggestions"
+            aria-activedescendant={showDropdown && activeMatch >= 0 ? `po-term-option-${activeMatch}` : undefined}
+            autoComplete="off"
+          />
+
+          {showDropdown && (
+            <ul
+              id="po-terms-suggestions"
+              role="listbox"
+              className="absolute left-0 right-0 top-full mt-1 z-20 max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg py-1"
+            >
+              <li role="presentation" className="px-2.5 pt-0.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                Previously used terms
+              </li>
+              {visibleMatches.map((s, i) => {
+                const text = String(s.text || s);
+                return (
+                  <li
+                    key={text}
+                    id={`po-term-option-${i}`}
+                    role="option"
+                    aria-selected={i === activeMatch}
+                    // mousedown, not click: it runs before the input's blur closes the list
+                    onMouseDown={(e) => { e.preventDefault(); add(text); }}
+                    onMouseEnter={() => setActiveMatch(i)}
+                    className={`px-2.5 py-1.5 text-xs cursor-pointer flex items-start gap-2 ${i === activeMatch ? 'bg-emerald-50 text-emerald-900' : 'text-gray-700'}`}
+                  >
+                    <span className="flex-1 break-words"><Highlight text={text} query={query} /></span>
+                    {s.uses > 0 && (
+                      <span className="text-[10px] text-gray-400 whitespace-nowrap mt-0.5">
+                        {s.uses} PO{s.uses === 1 ? '' : 's'}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => add()}

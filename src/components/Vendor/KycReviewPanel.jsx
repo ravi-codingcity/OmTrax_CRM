@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
-  kycStatusMeta, kycDepartmentLabel, fmtDate, fmtDateTime, canReviewKyc, inr,
+  kycStatusMeta, kycDepartmentLabel, fmtDate, fmtDateTime, canReviewKyc,
 } from '../../config/finance';
 import KycDocumentList from './KycDocumentList';
 
@@ -49,7 +49,24 @@ const KycReviewPanel = ({ vendor, currentUser, onClose, onStartReview, onDecide 
   const isOperations = vendor.kycType === 'operations';
   const materials = vendor.materials || [];
   const services = vendor.services || [];
-  const history = [...(vendor.kycHistory || [])].reverse();
+  // Generating a KYC link used to write BOTH a 'created' and a
+  // 'link_generated' entry for the same click. The backend no longer does that,
+  // but records made before the fix still hold the pair — so a 'created' entry
+  // is hidden when a 'link_generated' entry describes the same moment.
+  // Nothing is deleted; only this view collapses them.
+  const history = useMemo(() => {
+    const raw = vendor.kycHistory || [];
+    const SAME_ACTION_MS = 5000;
+    const kept = raw.filter((h, i) => {
+      if (h.action !== 'created') return true;
+      const at = new Date(h.at).getTime();
+      return !raw.some((other, j) => (
+        j !== i && other.action === 'link_generated'
+        && Math.abs(new Date(other.at).getTime() - at) <= SAME_ACTION_MS
+      ));
+    });
+    return [...kept].reverse();
+  }, [vendor.kycHistory]);
 
   const decide = async (decision) => {
     if (decision === 'rejected' && !remarks.trim()) {
@@ -125,17 +142,17 @@ const KycReviewPanel = ({ vendor, currentUser, onClose, onStartReview, onDecide 
               <Row label="KYC Submitted" value={fmtDateTime(vendor.kycSubmittedAt)} />
 
               {/* Company & statutory details, as submitted on the KYC form */}
-              {(vendor.companySize || vendor.shopEstablishmentNumber || vendor.iecCode
-                || vendor.pfNumber || vendor.esiNumber || vendor.numberOfVehicles != null) && (
+              {/* PF and ESI are collected as DOCUMENTS now, so their old number
+                  fields are not shown here — the uploads appear under Documents.
+                  IEC is likewise no longer collected. */}
+              {(vendor.companySize || vendor.shopEstablishmentNumber
+                || vendor.numberOfVehicles != null) && (
                 <div className="pt-2 mt-2 border-t border-gray-100">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">
                     Company &amp; Statutory
                   </p>
                   <Row label="Company Size" value={vendor.companySize && `${vendor.companySize} employees`} />
                   <Row label="Shop Establishment No." value={vendor.shopEstablishmentNumber} mono />
-                  <Row label="IEC Code" value={vendor.iecCode} mono />
-                  <Row label="PF Number" value={vendor.pfNumber} mono />
-                  <Row label="ESI Number" value={vendor.esiNumber} mono />
                   {vendor.numberOfVehicles != null && vendor.numberOfVehicles !== '' && (
                     <Row label="Number of Vehicles" value={String(vendor.numberOfVehicles)} mono />
                   )}

@@ -12,7 +12,7 @@ import { exportRateComparisonPdf } from '../../utils/pdfExport';
 import { inr, fmtDate, isCrmAdmin } from '../../config/finance';
 import {
   RC_STATUSES, rcStatusMeta, canApproveRateComparisons, canEditComparison,
-  canRaisePo, isAwaitingDirector,
+  canRaisePo, isAwaitingDirector, comparisonView, quantityLabel, poPrefillFromComparison,
 } from '../../config/rateComparison';
 
 const RateComparisons = () => {
@@ -54,6 +54,7 @@ const RateComparisons = () => {
       if (!term) return true;
       return [rc.comparisonNumber, rc.materialName, rc.selectedVendorName, rc.createdByName]
         .some((f) => (f || '').toLowerCase().includes(term))
+        || comparisonView(rc).items.some((it) => (it.itemName || '').toLowerCase().includes(term))
         || (rc.quotations || []).some((q) => (q.vendorName || '').toLowerCase().includes(term));
     });
   }, [comparisons, search, statusFilter]);
@@ -99,27 +100,11 @@ const RateComparisons = () => {
     return res;
   };
 
-  // Approved comparison -> PO form, pre-filled from the approved quotation
+  // Approved comparison -> PO form, pre-filled with every item at the
+  // recommended vendor's quoted rates
   const handleCreatePo = (rc) => {
-    const q = (rc.quotations || []).find((x) => x.isSelected);
     navigate('/purchase/orders', {
-      state: {
-        prefillFromComparison: {
-          rateComparison: rc._id,
-          comparisonNumber: rc.comparisonNumber,
-          vendor: rc.selectedVendor?._id || rc.selectedVendor,
-          vendorName: rc.selectedVendorName,
-          taxPercent: q?.taxPercent ?? 18,
-          paymentTerms: q?.paymentTerms || '',
-          items: [{
-            itemName: rc.materialName,
-            description: rc.materialDescription || '',
-            quantity: rc.requiredQuantity,
-            unit: rc.unit || '',
-            rate: q?.quotedRate ?? 0,
-          }],
-        },
-      },
+      state: { prefillFromComparison: poPrefillFromComparison(rc) },
     });
   };
 
@@ -254,7 +239,7 @@ const RateComparisons = () => {
                         <th className={headCls}>Number</th>
                         <th className={headCls}>Date</th>
                         <th className={headCls}>Material</th>
-                        <th className={`${headCls} text-center`}>Qty</th>
+                        <th className={`${headCls} text-center`}>Qty / Items</th>
                         <th className={`${headCls} text-center`}>Vendors</th>
                         <th className={headCls}>Recommended</th>
                         <th className={`${headCls} text-right`}>Amount</th>
@@ -280,12 +265,15 @@ const RateComparisons = () => {
                             </td>
                             <td className={cellCls}>{fmtDate(rc.comparisonDate)}</td>
                             <td className={cellCls}>
-                              <p className="font-medium text-gray-800 truncate max-w-[180px]">{rc.materialName}</p>
+                              <p className="font-medium text-gray-800 truncate max-w-[180px]"
+                                title={comparisonView(rc).items.map((it) => it.itemName).join(', ')}>
+                                {rc.materialName}
+                              </p>
                               {rc.materialDescription && (
                                 <p className="text-gray-500 truncate max-w-[180px]">{rc.materialDescription}</p>
                               )}
                             </td>
-                            <td className={`${cellCls} text-center text-gray-700`}>{rc.requiredQuantity} {rc.unit}</td>
+                            <td className={`${cellCls} text-center text-gray-700`}>{quantityLabel(rc)}</td>
                             <td className={`${cellCls} text-center text-gray-700`}>{(rc.quotations || []).length}</td>
                             <td className={cellCls}>
                               {rc.selectedVendorName ? (
@@ -371,7 +359,7 @@ const RateComparisons = () => {
                         <span className={`px-2 py-0.5 rounded text-[10px] font-semibold flex-shrink-0 ${meta.badge}`}>{meta.label}</span>
                       </div>
                       <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
-                        <div><span className="text-gray-400">Qty:</span> {rc.requiredQuantity} {rc.unit}</div>
+                        <div><span className="text-gray-400">{comparisonView(rc).items.length > 1 ? 'Items:' : 'Qty:'}</span> {quantityLabel(rc)}</div>
                         <div><span className="text-gray-400">Vendors:</span> {(rc.quotations || []).length}</div>
                         <div><span className="text-gray-400">Recommended:</span> {rc.selectedVendorName || '—'}</div>
                         <div><span className="text-gray-400">Amount:</span> {selectedTotal != null ? inr(selectedTotal) : '—'}</div>

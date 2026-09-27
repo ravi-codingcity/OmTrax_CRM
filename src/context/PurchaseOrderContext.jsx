@@ -43,6 +43,12 @@ export const PurchaseOrderProvider = ({ children }) => {
     }
   }, []);
 
+  // Saved terms matching what is being typed, best match first
+  const searchTermsSuggestions = useCallback(async (q) => {
+    const res = await purchaseOrderAPI.getTermsSuggestions({ q });
+    return res.data.data || [];
+  }, []);
+
   const getOrder = useCallback(async (id) => {
     try {
       const res = await purchaseOrderAPI.getById(id);
@@ -80,13 +86,13 @@ export const PurchaseOrderProvider = ({ children }) => {
     try {
       const res = await purchaseOrderAPI.update(id, payload);
       upsert(res.data.data);
-      return { success: true, data: res.data.data };
+      return { success: true, data: res.data.data, message: res.data.message, unchanged: !!res.data.unchanged };
     } catch (err) {
       return { success: false, message: err.response?.data?.message || 'Failed to update purchase order' };
     }
   }, []);
 
-  // status: generated | sent | acknowledged | completed | cancelled
+  // status: generated | completed | cancelled
   const setStatus = useCallback(async (id, payload) => {
     try {
       const res = await purchaseOrderAPI.setStatus(id, payload);
@@ -109,7 +115,7 @@ export const PurchaseOrderProvider = ({ children }) => {
 
   return (
     <PurchaseOrderContext.Provider
-      value={{ orders, loading, fetchOrders, fetchStats, fetchTermsSuggestions, getOrder, addOrder, updateOrder, setStatus, deleteOrder }}
+      value={{ orders, loading, fetchOrders, fetchStats, fetchTermsSuggestions, searchTermsSuggestions, getOrder, addOrder, updateOrder, setStatus, deleteOrder }}
     >
       {children}
     </PurchaseOrderContext.Provider>

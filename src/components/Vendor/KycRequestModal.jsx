@@ -1,13 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { kycTypesForUser, kycTypeLabel } from '../../config/departments';
 
 /**
  * "Generate KYC Link" — the second, independent way to add a vendor.
  *
  * There are two KYC workflows, Purchase and Operations. A user who may only
- * generate one of them gets it straight away, asked for nothing, exactly as
- * before. Finance and administrators may generate either, so they pick first.
- * Adding a vendor manually never generates a link.
+ * generate one of them gets it without being asked; Finance and
+ * administrators may generate either, so they pick first. Everyone then names
+ * the vendor — a temporary, internal name that identifies the link in the
+ * Vendors list until the vendor submits the form, when the Legal Name they
+ * enter replaces it. Adding a vendor manually never generates a link.
  */
 const KycRequestModal = ({ onClose, onGenerate, onMarkSent, user }) => {
   const choices = kycTypesForUser(user);
@@ -18,39 +20,33 @@ const KycRequestModal = ({ onClose, onGenerate, onMarkSent, user }) => {
   const preset = choices.length === 1 ? choices[0].value : null;
 
   const [kycType, setKycType] = useState(preset);
+  const [vendorName, setVendorName] = useState('');
   const [result, setResult] = useState(null); // { kycLink, vendor }
-  // Only auto-generate when there is nothing to ask
-  const [busy, setBusy] = useState(Boolean(preset));
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [sentNote, setSentNote] = useState('');
-  const started = useRef(false);
 
-  const generate = async (type) => {
-    const chosen = type || kycType;
-    if (!chosen) return;
+  const trimmedName = vendorName.trim().replace(/\s+/g, ' ');
+
+  // No link without a vendor name — the backend enforces the same rule
+  const generate = async () => {
+    if (!kycType || busy) return;
+    if (!trimmedName) {
+      setError('Enter the vendor name to generate the KYC link.');
+      return;
+    }
     setBusy(true);
     setError('');
-    const res = await onGenerate({ kycType: chosen });
+    const res = await onGenerate({ kycType, vendorName: trimmedName });
     setBusy(false);
     if (res.success) setResult(res.data);
     else setError(res.message || 'Could not generate the link.');
   };
 
-  // Mint the link as soon as the dialog opens, when the type is already known.
-  // The ref guard stops React's development double-invoke from creating two
-  // vendor records.
-  useEffect(() => {
-    if (started.current || !preset) return;
-    started.current = true;
-    generate(preset);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const choose = (value) => {
     setKycType(value);
-    started.current = true;
-    generate(value);
+    setError('');
   };
 
   const copy = async () => {
@@ -100,7 +96,7 @@ const KycRequestModal = ({ onClose, onGenerate, onMarkSent, user }) => {
             <p className="text-[11px] text-gray-500 mt-0.5">
               {result
                 ? 'Share this link with the vendor.'
-                : (kycType ? 'Creating a unique link...' : 'Which KYC form should the vendor fill in?')}
+                : (kycType ? 'Name the vendor this link is for.' : 'Which KYC form should the vendor fill in?')}
             </p>
           </div>
           <button onClick={() => !busy && onClose()} className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-40"
@@ -144,20 +140,43 @@ const KycRequestModal = ({ onClose, onGenerate, onMarkSent, user }) => {
             </div>
           )}
 
-          {!busy && error && (
-            <>
-              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">{error}</div>
+          {/* Vendor name — required before the link is generated */}
+          {kycType && !busy && !result && (
+            <form onSubmit={(e) => { e.preventDefault(); generate(); }} className="space-y-3">
+              <div>
+                <label htmlFor="kyc-request-vendor-name" className="block text-[11px] font-medium text-gray-600 mb-1">
+                  Vendor Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="kyc-request-vendor-name"
+                  value={vendorName}
+                  onChange={(e) => { setVendorName(e.target.value); if (error) setError(''); }}
+                  maxLength={150}
+                  autoFocus
+                  autoComplete="off"
+                  placeholder="e.g. ABC Enterprises"
+                  className="w-full px-2.5 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
+                />
+                <p className="text-[11px] text-gray-500 mt-1.5">
+                  Shown in the Vendors list so your team can tell which vendor this link is for.
+                  The vendor does not see it, and the Legal Name they submit on the KYC form replaces it.
+                </p>
+              </div>
+
+              {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">{error}</div>}
+
               <div className="flex gap-2">
-                <button onClick={onClose}
+                <button type="button"
+                  onClick={() => (preset ? onClose() : choose(null))}
                   className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
-                  Close
+                  {preset ? 'Cancel' : 'Back'}
                 </button>
-                <button onClick={() => generate()}
-                  className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-amber-600 rounded-lg hover:bg-amber-700">
-                  Try Again
+                <button type="submit" disabled={!trimmedName}
+                  className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50">
+                  Generate KYC Link
                 </button>
               </div>
-            </>
+            </form>
           )}
 
           {!busy && result && (
@@ -180,9 +199,9 @@ const KycRequestModal = ({ onClose, onGenerate, onMarkSent, user }) => {
               </div>
 
               <div className="bg-gray-50 rounded-lg px-3 py-2 text-[11px] text-gray-600">
-                Until the vendor submits, this appears in the list as{' '}
-                <strong className="font-mono text-gray-800">{result.vendor?.vendorName}</strong> with status{' '}
-                <strong>Sent</strong>. Their real name replaces it on submission.
+                Until the vendor submits, this appears in the Vendors list as{' '}
+                <strong className="text-gray-800">{result.vendor?.vendorName}</strong> with status{' '}
+                <strong>Sent</strong>. The Legal Name the vendor submits replaces it.
               </div>
 
               <div className="grid grid-cols-2 gap-2">

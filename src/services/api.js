@@ -172,7 +172,9 @@ export const vendorAPI = {
   createKycRequest: (data) => api.post('/vendors/kyc-request', data),
   update: (id, data) => api.put(`/vendors/${id}`, data),
   delete: (id) => api.delete(`/vendors/${id}`),
-  // KYC link management (Purchase Manager, Finance, Admin)
+  // KYC link management (Purchase Manager, Operations, Finance, Admin)
+  // Read the link already saved — never mints a new one.
+  getSavedKycLink: (id) => api.get(`/vendors/${id}/kyc-link`),
   generateKycLink: (id, data = {}) => api.post(`/vendors/${id}/kyc-link`, data),
   markKycLinkSent: (id, data = {}) => api.post(`/vendors/${id}/kyc-link/sent`, data),
   // KYC review — the backend rejects non-Finance callers with 403
@@ -190,7 +192,8 @@ export const purchaseOrderAPI = {
   getAll: (params = {}) => api.get('/purchase-orders', { params }),
   getStats: () => api.get('/purchase-orders/stats'),
   // Terms used on previous POs, offered as suggestions on the next one
-  getTermsSuggestions: () => api.get('/purchase-orders/terms-suggestions'),
+  // Pass { q } to search every saved term for matches while typing
+  getTermsSuggestions: (params = {}) => api.get('/purchase-orders/terms-suggestions', { params }),
   getById: (id) => api.get(`/purchase-orders/${id}`),
   create: (data) => api.post('/purchase-orders', data),
   update: (id, data) => api.put(`/purchase-orders/${id}`, data),

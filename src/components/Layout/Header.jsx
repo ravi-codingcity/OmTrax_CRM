@@ -294,12 +294,13 @@ const Header = () => {
 
     // Purchase Order notifications
     if (notification.type?.startsWith('po_')) {
-      const isSent = notification.type === 'po_sent';
+      // 'po_sent' only exists on notifications from before POs stopped being
+      // sent through the CRM
       return (
         <>
           <p className="text-sm text-gray-800">
             <span className="font-semibold text-emerald-600">
-              {isSent ? '📤 PO Sent' : '🧾 PO Created'}
+              {notification.type === 'po_sent' ? '📤 PO Sent' : '🧾 PO Created'}
             </span>
             <span className="text-gray-600"> by </span>
             <span className="font-medium">{getSalesPersonName()}</span>

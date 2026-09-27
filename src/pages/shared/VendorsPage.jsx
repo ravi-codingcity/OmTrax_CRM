@@ -21,7 +21,7 @@ const VendorsPage = ({ department = 'purchase' }) => {
   const {
     vendors, loading, fetchVendors, getVendor,
     addVendor, createKycRequest, updateVendor, deleteVendor,
-    markKycLinkSent, startKycReview, decideKyc,
+    markKycLinkSent, startKycReview, decideKyc, getSavedKycLink,
   } = useVendors();
 
   // Two distinct permissions: editing the record, and requesting a KYC.
@@ -91,6 +91,24 @@ const VendorsPage = ({ department = 'purchase' }) => {
     const res = await decideKyc(id, decision, remarks);
     if (res.success) { flash(`Vendor KYC ${decision}. Purchase has been notified.`); loadData(); }
     return res;
+  };
+
+  // Copy the link that was already generated — never mint a new one, which
+  // would invalidate the link the vendor may already be holding.
+  const copyKycLink = async (vendor) => {
+    const res = await getSavedKycLink(vendor._id);
+    if (!res.success) return flash(res.message || 'Could not load the saved KYC link.');
+    try {
+      await navigator.clipboard.writeText(res.data.kycLink);
+      flash(
+        res.data.usable
+          ? `${res.data.kycTypeLabel} link copied.`
+          : `${res.data.kycTypeLabel} link copied — note it is ${res.data.expired ? 'expired' : 'already submitted'}.`
+      );
+    } catch {
+      // Clipboard blocked (insecure context, or permission denied)
+      window.prompt('Copy the KYC link below:', res.data.kycLink);
+    }
   };
 
   const confirmDelete = async () => {
@@ -236,6 +254,7 @@ const VendorsPage = ({ department = 'purchase' }) => {
             onReview={mayReview ? openRecord : null}
             onEdit={mayEdit ? (v) => setModal({ open: true, mode: 'edit', vendor: v }) : null}
             onDelete={isCrmAdmin(user) ? setDeleteTarget : null}
+            onCopyLink={mayRequestKyc ? copyKycLink : null}
             emptyMessage={search || statusFilter ? 'No vendors match these filters' : 'No vendors yet'}
           />
 
