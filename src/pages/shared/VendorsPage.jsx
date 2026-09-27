@@ -7,10 +7,11 @@ import VendorTable from '../../components/Vendor/VendorTable';
 import VendorModal from '../../components/Vendor/VendorModal';
 import KycReviewPanel from '../../components/Vendor/KycReviewPanel';
 import KycRequestModal from '../../components/Vendor/KycRequestModal';
+import CorrectionLinkModal from '../../components/Vendor/CorrectionLinkModal';
 import {
   KYC_STATUSES, kycStatusMeta, canEditVendors, canReviewKyc, isCrmAdmin,
 } from '../../config/finance';
-import { kycTypesForUser } from '../../config/departments';
+import { kycTypesForUser, canGenerateCorrectionLink } from '../../config/departments';
 
 /**
  * The shared vendor register. Purchase and Finance render the SAME data from
@@ -22,6 +23,7 @@ const VendorsPage = ({ department = 'purchase' }) => {
     vendors, loading, fetchVendors, getVendor,
     addVendor, createKycRequest, updateVendor, deleteVendor,
     markKycLinkSent, startKycReview, decideKyc, getSavedKycLink,
+    requestKycCorrection, getCorrectionOptions, generateCorrectionLink,
   } = useVendors();
 
   // Two distinct permissions: editing the record, and requesting a KYC.
@@ -41,6 +43,7 @@ const VendorsPage = ({ department = 'purchase' }) => {
 
   const [modal, setModal] = useState({ open: false, mode: 'add', vendor: null });
   const [kycRequestOpen, setKycRequestOpen] = useState(false);
+  const [correctionTarget, setCorrectionTarget] = useState(null);
   const [reviewTarget, setReviewTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [message, setMessage] = useState('');
@@ -70,8 +73,11 @@ const VendorsPage = ({ department = 'purchase' }) => {
     const c = { total: vendors.length };
     KYC_STATUSES.forEach((s) => { c[s] = vendors.filter((v) => v.kycStatus === s).length; });
     c.awaiting = c.submitted + c.under_review;
+    // Sent back by Finance and still waiting on this department
+    c.toCorrect = vendors.filter((v) => v.kycStatus === 'correction_required'
+      && canGenerateCorrectionLink(user, v.kycType || 'purchase')).length;
     return c;
-  }, [vendors]);
+  }, [vendors, user]);
 
   // Open a full record — refetched so documents and history are current
   const openRecord = async (vendor) => {
@@ -93,6 +99,12 @@ const VendorsPage = ({ department = 'purchase' }) => {
     return res;
   };
 
+  const handleRequestCorrection = async (id, remarks) => {
+    const res = await requestKycCorrection(id, remarks);
+    if (res.success) { flash(`${res.message}. The department has been notified.`); loadData(); }
+    return res;
+  };
+
   // Copy the link that was already generated — never mint a new one, which
   // would invalidate the link the vendor may already be holding.
   const copyKycLink = async (vendor) => {
@@ -100,10 +112,11 @@ const VendorsPage = ({ department = 'purchase' }) => {
     if (!res.success) return flash(res.message || 'Could not load the saved KYC link.');
     try {
       await navigator.clipboard.writeText(res.data.kycLink);
+      const kind = res.data.linkType === 'correction' ? `${res.data.kycTypeLabel} correction` : res.data.kycTypeLabel;
       flash(
         res.data.usable
-          ? `${res.data.kycTypeLabel} link copied.`
-          : `${res.data.kycTypeLabel} link copied — note it is ${res.data.expired ? 'expired' : 'already submitted'}.`
+          ? `${kind} link copied.`
+          : `${kind} link copied — note it is ${res.data.expired ? 'expired' : 'already submitted'}.`
       );
     } catch {
       // Clipboard blocked (insecure context, or permission denied)
@@ -200,6 +213,23 @@ const VendorsPage = ({ department = 'purchase' }) => {
             </div>
           )}
 
+          {/* Sent back by Finance — the department's call to action */}
+          {!isFinanceView && counts.toCorrect > 0 && (
+            <div className="bg-orange-50 border border-orange-300 rounded-lg px-4 py-2.5 flex items-center gap-2.5">
+              <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
+              <p className="text-xs sm:text-sm text-orange-900">
+                <strong>{counts.toCorrect}</strong> KYC{counts.toCorrect === 1 ? '' : 's'} sent back by Finance for correction.
+                Generate a correction link from the Actions column.
+              </p>
+              <button
+                onClick={() => setStatusFilter(statusFilter === 'correction_required' ? '' : 'correction_required')}
+                className="ml-auto text-xs font-medium text-orange-800 underline underline-offset-2 flex-shrink-0"
+              >
+                {statusFilter === 'correction_required' ? 'Show all' : 'Show them'}
+              </button>
+            </div>
+          )}
+
           {/* Status filter chips */}
           <div className="flex flex-wrap gap-1.5">
             {chip('All', counts.total, !statusFilter, () => setStatusFilter(''))}
@@ -255,6 +285,8 @@ const VendorsPage = ({ department = 'purchase' }) => {
             onEdit={mayEdit ? (v) => setModal({ open: true, mode: 'edit', vendor: v }) : null}
             onDelete={isCrmAdmin(user) ? setDeleteTarget : null}
             onCopyLink={mayRequestKyc ? copyKycLink : null}
+            onCorrection={setCorrectionTarget}
+            canCorrect={(v) => canGenerateCorrectionLink(user, v.kycType || 'purchase')}
             emptyMessage={search || statusFilter ? 'No vendors match these filters' : 'No vendors yet'}
           />
 
@@ -292,10 +324,22 @@ const VendorsPage = ({ department = 'purchase' }) => {
       )}
 
 
+      {correctionTarget && (
+        <CorrectionLinkModal
+          vendor={correctionTarget}
+          onClose={() => { setCorrectionTarget(null); loadData(); }}
+          onLoadOptions={getCorrectionOptions}
+          onGenerate={generateCorrectionLink}
+          onMarkSent={markKycLinkSent}
+        />
+      )}
+
       {reviewTarget && (
         <KycReviewPanel
           vendor={reviewTarget}
           currentUser={user}
+          onRequestCorrection={handleRequestCorrection}
+          onOpenCorrection={(v) => { setReviewTarget(null); setCorrectionTarget(v); }}
           onClose={() => { setReviewTarget(null); loadData(); }}
           onStartReview={async (id) => {
             const res = await startKycReview(id);

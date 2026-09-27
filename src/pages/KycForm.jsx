@@ -108,6 +108,14 @@ const RevealCheckbox = ({ label, checked, onChange, disabled, children }) => (
 );
 
 const INPUT_CLS = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all';
+
+// Section order and the numbers they carry on the full form. A Correction KYC
+// Link shows only some sections, and numbers those that remain in order.
+const SECTION_ORDER = ['vendor', 'company', 'locations', 'supply', 'documents', 'templates', 'bank', 'additional'];
+const FULL_FORM_STEPS = { vendor: 1, company: 2, locations: 3, supply: 4, documents: 5, templates: 6, bank: 7, additional: 8 };
+// Which correction choices live in the Vendor Information and Company sections
+const VENDOR_SECTION_KEYS = ['vendorName', 'companyName', 'address', 'contactDetails', 'gstNumber', 'otherStateGst', 'panNumber'];
+const COMPANY_SECTION_KEYS = ['companySize', 'shopEstablishment'];
 const LABEL_CLS = 'block text-xs font-medium text-gray-600 mb-1';
 
 // Module scope on purpose — a component created during render is remounted on
@@ -175,6 +183,9 @@ const KycForm = () => {
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState('');   // what the vendor is waiting on
   const [result, setResult] = useState(null);
+  // Set when this is a Correction KYC Link: the details and documents the
+  // vendor was asked to correct. Only those are shown and submitted.
+  const [correction, setCorrection] = useState(null);
   // Hard guard against a double submit — more reliable than the disabled
   // attribute alone, which a fast second click can slip past.
   const inFlight = useRef(false);
@@ -219,7 +230,14 @@ const KycForm = () => {
         companySize: d.companySize || '',
         serviceLocation: d.serviceLocation || '',
         numberOfVehicles: d.numberOfVehicles === 0 || d.numberOfVehicles ? String(d.numberOfVehicles) : '',
+        // Sent only on a Correction KYC Link that asks for these
+        bankName: d.bankName || '',
+        accountHolderName: d.accountHolderName || '',
+        accountNumber: d.accountNumber || '',
+        ifscCode: d.ifscCode || '',
+        kycAdditionalInfo: d.kycAdditionalInfo || '',
       }));
+      setCorrection(d.correction && Array.isArray(d.correction.fields) ? d.correction : null);
       // Dropdown sources. Materials come from the Purchase Department's item
       // master via the form endpoint, so anything the Purchase Manager adds
       // shows up here without a code change.
@@ -305,15 +323,34 @@ const KycForm = () => {
 
   const hasFileErrors = useMemo(() => Object.keys(fileErrors).length > 0, [fileErrors]);
 
+  // --- Correction KYC Link ---------------------------------------------------
+  // On the full form everything shows; on a correction link, only what the
+  // department selected. The server enforces the same selection.
+  const inCorrection = !!correction;
+  const selectedKeys = useMemo(
+    () => new Set((correction?.fields || []).map((c) => c.key)),
+    [correction]
+  );
+  const show = (key) => !inCorrection || selectedKeys.has(key);
+  // The form inputs a correction resubmits (e.g. Bank Details -> four inputs)
+  const correctionBodyKeys = useMemo(
+    () => new Set((correction?.fields || []).filter((c) => c.type === 'field').flatMap((c) => c.bodyFields || [])),
+    [correction]
+  );
+  const supplyKey = formCfg.collectsMaterials ? 'materials' : 'services';
+
   // A vendor entering URP is not GST registered: the GST certificate slot is
   // hidden, and the company registration document stays on offer but stops
   // being mandatory. `required` comes back already resolved, so the asterisks
   // and the submit check below agree. Mirrored by the backend.
   const unregistered = isUrp(form.gstNumber);
-  const shownDocs = useMemo(
-    () => documentsFor(docFields, form.gstNumber),
-    [docFields, form.gstNumber]
-  );
+  // On a correction link only the selected documents are asked for, and each is
+  // required — it is being replaced or supplied.
+  const shownDocs = useMemo(() => {
+    const docs = documentsFor(docFields, form.gstNumber);
+    if (!inCorrection) return docs;
+    return docs.filter((d) => selectedKeys.has(d.field)).map((d) => ({ ...d, required: true }));
+  }, [docFields, form.gstNumber, inCorrection, selectedKeys]);
   // The two template documents keep their own always-visible section, so the
   // vendor can see a template exists before deciding whether they have one.
   const templateDocs = useMemo(
@@ -327,6 +364,20 @@ const KycForm = () => {
 
   const fileCount = useMemo(() => Object.keys(files).length, [files]);
 
+  const sectionVisible = {
+    vendor: VENDOR_SECTION_KEYS.some(show),
+    company: COMPANY_SECTION_KEYS.some(show),
+    locations: show('serviceLocations'),
+    supply: show(supplyKey),
+    documents: !inCorrection || shownDocs.some((d) => !TEMPLATE_META[d.field]),
+    templates: templateDocs.length > 0,
+    bank: show('bankDetails'),
+    additional: show('additionalInfo'),
+  };
+  const stepOf = (id) => String(inCorrection
+    ? SECTION_ORDER.filter((k) => sectionVisible[k]).indexOf(id) + 1
+    : FULL_FORM_STEPS[id]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     // Never let a second request start while one is running
@@ -334,42 +385,45 @@ const KycForm = () => {
     setErrors([]);
 
     // Mirror the backend's checks so the vendor gets immediate feedback
+    // (On a correction link, only the selected details are checked)
     const problems = [];
-    if (!form.vendorName.trim()) problems.push('Legal Name (as per PAN) is required');
-    if (!form.companyName.trim()) problems.push('Vendor Company Name is required');
-    if (!form.address.trim()) problems.push('Company address is required');
-    if (!form.email.trim()) problems.push('Email ID is required');
-    if (!form.phone.trim()) problems.push('Phone number is required');
-    if (!form.panNumber.trim()) problems.push('PAN card number is required');
+    if (show('vendorName') && !form.vendorName.trim()) problems.push('Legal Name (as per PAN) is required');
+    if (show('companyName') && !form.companyName.trim()) problems.push('Vendor Company Name is required');
+    if (show('address') && !form.address.trim()) problems.push('Company address is required');
+    if (show('contactDetails') && !form.email.trim()) problems.push('Email ID is required');
+    if (show('contactDetails') && !form.phone.trim()) problems.push('Phone number is required');
+    if (show('panNumber') && !form.panNumber.trim()) problems.push('PAN card number is required');
 
     const gst = form.gstNumber.trim();
-    if (!gst) problems.push(`GST Number / URP is required — enter your GST number, or ${URP_VALUE} if you are not GST registered`);
-    else if (!isUrp(gst) && !isValidGst(gst)) {
-      problems.push(`Enter a valid GST number, or ${URP_VALUE} if you are not GST registered`);
+    if (show('gstNumber')) {
+      if (!gst) problems.push(`GST Number / URP is required — enter your GST number, or ${URP_VALUE} if you are not GST registered`);
+      else if (!isUrp(gst) && !isValidGst(gst)) {
+        problems.push(`Enter a valid GST number, or ${URP_VALUE} if you are not GST registered`);
+      }
     }
 
     // Each form asks for only what it collects
-    if (formCfg.collectsMaterials && !materials.length) {
+    if (formCfg.collectsMaterials && show('materials') && !materials.length) {
       problems.push('Select at least one material you supply');
     }
-    if (formCfg.collectsServices && !services.length) {
+    if (formCfg.collectsServices && show('services') && !services.length) {
       problems.push('Select at least one service you provide');
     }
 
     // At least one state is required on both forms; cities remain optional
-    if (!serviceLocations.some((l) => (l.state || '').trim())) {
+    if (show('serviceLocations') && !serviceLocations.some((l) => (l.state || '').trim())) {
       problems.push('Add at least one Service Location (State / UT)');
     }
 
     const seenLocationStates = new Set();
-    serviceLocations.forEach((l, i) => {
+    if (show('serviceLocations')) serviceLocations.forEach((l, i) => {
       const st = (l.state || '').trim();
       if (!st) { problems.push(`Service location #${i + 1}: select a state`); return; }
       if (seenLocationStates.has(st)) problems.push(`${st} is listed twice in Service Locations`);
       seenLocationStates.add(st);
     });
 
-    if (hasOtherStateGst) {
+    if (hasOtherStateGst && show('otherStateGst')) {
       const seen = new Set();
       otherStateGst.forEach((row, i) => {
         const st = (row.state || '').trim();
@@ -402,23 +456,25 @@ const KycForm = () => {
 
     const fd = new FormData();
     Object.entries(form).forEach(([k, v]) => {
+      // A correction link sends only the details it asked for
+      if (inCorrection && !correctionBodyKeys.has(k)) return undefined;
       // Never send a value whose field is hidden
       if (k === 'numberOfVehicles' && !showVehicles) return fd.append(k, '');
       return fd.append(k, v);
     });
     // Multipart cannot carry a real array, so the lists travel as JSON.
     // Materials and services are kept separate all the way into MongoDB.
-    fd.append('materials', JSON.stringify(formCfg.collectsMaterials ? materials.map((m) => ({ materialName: m })) : []));
-    fd.append('services', JSON.stringify(formCfg.collectsServices ? services.map((sv) => ({ serviceName: sv })) : []));
+    if (show('materials')) fd.append('materials', JSON.stringify(formCfg.collectsMaterials ? materials.map((m) => ({ materialName: m })) : []));
+    if (show('services')) fd.append('services', JSON.stringify(formCfg.collectsServices ? services.map((sv) => ({ serviceName: sv })) : []));
     // Only the rows the vendor can actually see are sent
     // Structured: each state carries its own cities
-    fd.append('serviceLocations', JSON.stringify(
+    if (show('serviceLocations')) fd.append('serviceLocations', JSON.stringify(
       serviceLocations
         .filter((l) => (l.state || '').trim())
         .map((l) => ({ state: l.state.trim(), cities: (l.cities || []).map((c) => c.trim()).filter(Boolean) }))
     ));
-    fd.append('hasShopEstablishment', String(hasShop));
-    fd.append('otherStateGst', JSON.stringify(
+    if (show('shopEstablishment')) fd.append('hasShopEstablishment', String(hasShop));
+    if (show('otherStateGst')) fd.append('otherStateGst', JSON.stringify(
       hasOtherStateGst
         ? otherStateGst
             .filter((r) => (r.state || '').trim() || (r.gstNumber || '').trim())
@@ -489,6 +545,24 @@ const KycForm = () => {
     );
   }
 
+  if (state === 'done' && inCorrection) {
+    return (
+      <Shell>
+        <Notice tone="green" title="Correction submitted successfully">
+          <p>{result?.message || 'Your corrected details are now with our Finance team for review.'}</p>
+          <div className="mt-4 bg-white/70 rounded-lg p-3 text-xs text-gray-600 inline-block text-left">
+            <p><strong>Vendor:</strong> {result?.data?.vendorName || form.vendorName}</p>
+            <p><strong>Corrected:</strong> {(result?.data?.corrected || correction.fields.map((c) => c.label)).join(', ')}</p>
+            <p><strong>Documents uploaded:</strong> {result?.data?.documents ?? 0}</p>
+          </div>
+          <p className="mt-4 text-xs text-gray-500">
+            You can close this page. We'll be in touch once the review is complete.
+          </p>
+        </Notice>
+      </Shell>
+    );
+  }
+
   if (state === 'done') {
     return (
       <Shell>
@@ -516,13 +590,31 @@ const KycForm = () => {
     <Shell>
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3 border-b border-amber-100">
-          <h1 className="text-lg font-semibold text-gray-800">Vendor KYC Form</h1>
+          <h1 className="text-lg font-semibold text-gray-800">{inCorrection ? 'Vendor KYC Correction' : 'Vendor KYC Form'}</h1>
           <p className="text-xs text-gray-600 mt-0.5">
-            {formCfg.label} &middot; please complete all required fields and upload the listed documents.
+            {inCorrection
+              ? <>{formCfg.label} &middot; please correct only the items below. Everything else you submitted stays as it is.</>
+              : <>{formCfg.label} &middot; please complete all required fields and upload the listed documents.</>}
           </p>
         </div>
 
         <div className="p-3 sm:p-4 space-y-3">
+          {inCorrection && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3">
+              <p className="text-sm font-medium text-orange-900">Please correct the following:</p>
+              <ul className="flex flex-wrap gap-1.5 mt-2">
+                {correction.fields.map((c) => (
+                  <li key={c.key} className="px-2 py-0.5 rounded-md bg-white border border-orange-200 text-xs text-orange-900">{c.label}</li>
+                ))}
+              </ul>
+              {correction.vendorNote && (
+                <p className="text-xs text-orange-900 mt-2 whitespace-pre-wrap break-words">
+                  <span className="font-semibold">Note from OmTrax:</span> {correction.vendorNote}
+                </p>
+              )}
+            </div>
+          )}
+
           {errors.length > 0 && (
             <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
               <p className="text-sm font-medium text-red-800">Please check the following:</p>
@@ -532,16 +624,19 @@ const KycForm = () => {
             </div>
           )}
 
-          <Section title="Vendor Information" step="1" hint="Legal identity and contact details">
+          {sectionVisible.vendor && (
+          <Section title="Vendor Information" step={stepOf('vendor')} hint="Legal identity and contact details">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              <Field name="vendorName" title="Legal Name (as per PAN)" placeholder="Exactly as printed on your PAN" required hint="Must match your PAN document" {...f} />
-              <Field name="companyName" title="Vendor Company Name" placeholder="Your trading / company name" required {...f} />
-              <Field name="address" title="Company Address" placeholder="Full registered address" required className="sm:col-span-2 lg:col-span-3" {...f} />
-              <Field name="email" title="Email ID" type="email" placeholder="you@company.com" required {...f} />
-              <Field name="phone" title="Phone Number" placeholder="10-digit mobile" required {...f} />
+              {show('vendorName') && <Field name="vendorName" title="Legal Name (as per PAN)" placeholder="Exactly as printed on your PAN" required hint="Must match your PAN document" {...f} />}
+              {show('companyName') && <Field name="companyName" title="Vendor Company Name" placeholder="Your trading / company name" required {...f} />}
+              {show('address') && <Field name="address" title="Company Address" placeholder="Full registered address" required className="sm:col-span-2 lg:col-span-3" {...f} />}
+              {show('contactDetails') && <Field name="email" title="Email ID" type="email" placeholder="you@company.com" required {...f} />}
+              {show('contactDetails') && <Field name="phone" title="Phone Number" placeholder="10-digit mobile" required {...f} />}
+              {(show('gstNumber') || show('otherStateGst')) && (
               <div className="sm:col-span-2 lg:col-span-3">
                 <div className="border border-amber-200 bg-amber-50/50 rounded-lg p-2.5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-start">
+                    {show('gstNumber') && (
                     <div>
                       <label className={LABEL_CLS}>
                         GST Number / URP <span className="text-red-500">*</span>
@@ -564,9 +659,11 @@ const KycForm = () => {
                         &mdash; Unregistered Proprietorship.
                       </p>
                     </div>
+                    )}
 
                     {/* Sits beside the GST field so it cannot be missed */}
-                    <div className="sm:pt-5">
+                    {show('otherStateGst') && (
+                    <div className={show('gstNumber') ? 'sm:pt-5' : ''}>
                       <label className={`flex items-start gap-2 cursor-pointer select-none rounded-lg border p-2
                                          transition-colors duration-200 ${
                         hasOtherStateGst ? 'border-amber-400 bg-white' : 'border-amber-200 bg-white/70 hover:border-amber-300'
@@ -588,9 +685,10 @@ const KycForm = () => {
                         </span>
                       </label>
                     </div>
+                    )}
                   </div>
 
-                  {hasOtherStateGst && (
+                  {hasOtherStateGst && show('otherStateGst') && (
                     <div className="mt-2.5 space-y-2 animate-[fadeIn_200ms_ease-out]">
                       {otherStateGst.map((row, i) => (
                         <div key={i} className="flex flex-col sm:flex-row gap-2">
@@ -635,23 +733,27 @@ const KycForm = () => {
                   )}
                 </div>
               </div>
-              <Field name="panNumber" title="PAN Card Number" placeholder="ABCDE1234F" required hint="10 characters" {...f} />
-              <Field name="contactPerson" title="Contact Person" placeholder="Primary contact" {...f} />
-              <Field name="city" title="City" placeholder="City" {...f} />
-              <Field name="state" title="State" placeholder="State" {...f} />
-              <Field name="pincode" title="Pincode" placeholder="6-digit" {...f} />
+              )}
+              {show('panNumber') && <Field name="panNumber" title="PAN Card Number" placeholder="ABCDE1234F" required hint="10 characters" {...f} />}
+              {show('contactDetails') && <Field name="contactPerson" title="Contact Person" placeholder="Primary contact" {...f} />}
+              {show('address') && <Field name="city" title="City" placeholder="City" {...f} />}
+              {show('address') && <Field name="state" title="State" placeholder="State" {...f} />}
+              {show('address') && <Field name="pincode" title="Pincode" placeholder="6-digit" {...f} />}
             </div>
           </Section>
+          )}
 
+          {sectionVisible.company && (
           <Section
             title="Company & Statutory Details"
-            step="2"
+            step={stepOf('company')}
             hint="All optional — fill in whatever applies"
           >
             <div className="space-y-2.5">
               {/* Company Size and Shop Establishment share one row. The Shop
                   field stays behind its checkbox and expands in place. */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-start">
+                {show('companySize') && (
                 <div>
                   <label className={LABEL_CLS}>Company Size</label>
                   <select
@@ -666,20 +768,25 @@ const KycForm = () => {
                     ))}
                   </select>
                 </div>
+                )}
 
+                {show('shopEstablishment') && (
                 <RevealCheckbox
                   label="Do you have Shop Establishment Number?"
                   checked={hasShop} onChange={toggleShop} disabled={submitting}
                 >
                   <Field name="shopEstablishmentNumber" title="Shop Establishment Number" placeholder="Shop & Establishment registration" {...f} />
                 </RevealCheckbox>
+                )}
               </div>
             </div>
           </Section>
+          )}
 
+          {sectionVisible.locations && (
           <Section
             title="Service Locations"
-            step="3"
+            step={stepOf('locations')}
             required
             hint="At least one State — cities optional"
           >
@@ -692,10 +799,12 @@ const KycForm = () => {
               maxStates={stateOptions.length}
             />
           </Section>
+          )}
 
+          {sectionVisible.supply && (
           <Section
             title={formCfg.collectsMaterials ? 'Material Details' : formCfg.servicesLabel}
-            step="4"
+            step={stepOf('supply')}
             required
             hint={
               formCfg.collectsMaterials
@@ -733,12 +842,28 @@ const KycForm = () => {
               </div>
             )}
           </Section>
+          )}
 
+          {sectionVisible.documents && (
           <Section
             title="Documents"
-            step="5"
-            hint={`Tick the optional ones you have · under ${MAX_FILE_MB} MB each`}
+            step={stepOf('documents')}
+            hint={inCorrection
+              ? `Upload a corrected copy of each · under ${MAX_FILE_MB} MB each`
+              : `Tick the optional ones you have · under ${MAX_FILE_MB} MB each`}
           >
+            {inCorrection && Object.keys(correction.currentDocuments || {}).length > 0 && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-xs text-gray-600">
+                <p className="font-medium text-gray-700 mb-0.5">Currently on file — your upload replaces it:</p>
+                <ul className="space-y-0.5">
+                  {shownDocs.filter((d) => correction.currentDocuments[d.field]).map((d) => (
+                    <li key={d.field}>
+                      {d.label}: <span className="font-mono">{correction.currentDocuments[d.field].originalName}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {!uploadsEnabled && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3 text-xs text-amber-800">
                 Document upload is temporarily unavailable. Please contact your OmTrax representative before submitting.
@@ -751,23 +876,27 @@ const KycForm = () => {
               </div>
             )}
             <KycDocumentUpload
-              documents={shownDocs}
+              // A correction may require a template document; those have their
+              // own section below, so they are not listed here twice
+              documents={inCorrection ? shownDocs.filter((d) => !TEMPLATE_META[d.field]) : shownDocs}
               files={files}
               errors={fileErrors}
               disabled={submitting || !uploadsEnabled}
               onChange={onFileChange}
             />
           </Section>
+          )}
 
           {templateDocs.length > 0 && (
             <Section
               title="Agreement & TDS Forms"
-              step="6"
-              hint="Download, fill in, then upload \u2014 both optional"
+              step={stepOf('templates')}
+              hint={inCorrection ? 'Download, fill in, then upload the corrected copy' : 'Download, fill in, then upload \\u2014 both optional'}
             >
               <p className="text-xs text-gray-500 mb-2.5">
-                These two forms are completed offline. Download the template, fill it in,
-                and upload the finished document. You can submit your KYC without them.
+                {inCorrection
+                  ? 'Download the template, fill it in, and upload the corrected document.'
+                  : 'These two forms are completed offline. Download the template, fill it in, and upload the finished document. You can submit your KYC without them.'}
               </p>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
                 {templateDocs.map((d) => (
@@ -788,7 +917,8 @@ const KycForm = () => {
             </Section>
           )}
 
-          <Section title="Bank Details" step="7" hint="Optional, but speeds up payment setup">
+          {sectionVisible.bank && (
+          <Section title="Bank Details" step={stepOf('bank')} hint="Optional, but speeds up payment setup">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
               <Field name="bankName" title="Bank Name" placeholder="e.g. HDFC Bank" {...f} />
               <Field name="accountHolderName" title="Account Holder Name" placeholder="As per bank records" {...f} />
@@ -796,8 +926,10 @@ const KycForm = () => {
               <Field name="ifscCode" title="IFSC Code" placeholder="HDFC0001234" hint="11 characters" {...f} />
             </div>
           </Section>
+          )}
 
-          <Section title="Additional Information" step="8">
+          {sectionVisible.additional && (
+          <Section title="Additional Information" step={stepOf('additional')}>
             <textarea
               value={form.kycAdditionalInfo}
               onChange={(e) => setField('kycAdditionalInfo', e.target.value)}
@@ -806,6 +938,7 @@ const KycForm = () => {
               placeholder="Anything else our Finance team should know (optional)"
             />
           </Section>
+          )}
 
           <div>
             {/* Progress while the documents are on their way */}
@@ -840,7 +973,7 @@ const KycForm = () => {
                   </svg>
                   {progress > 0 && progress < 100 ? `Uploading ${progress}%` : 'Submitting...'}
                 </>
-              ) : 'Submit KYC'}
+              ) : inCorrection ? 'Submit Correction' : 'Submit KYC'}
             </button>
             <p className="text-[11px] text-gray-400 text-center mt-2">
               Your information is submitted securely and reviewed by the OmTrax Finance team.

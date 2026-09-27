@@ -13,7 +13,9 @@ import {
 const FinanceDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { vendors, loading, fetchVendors, fetchStats, getVendor, startKycReview, decideKyc } = useVendors();
+  const {
+    vendors, loading, fetchVendors, fetchStats, getVendor, startKycReview, decideKyc, requestKycCorrection,
+  } = useVendors();
 
   const [stats, setStats] = useState(null);
   const [reviewTarget, setReviewTarget] = useState(null);
@@ -54,6 +56,16 @@ const FinanceDashboard = () => {
     const res = await decideKyc(id, decision, remarks);
     if (res.success) {
       setMessage(`Vendor KYC ${decision}. The Purchase department has been notified.`);
+      setTimeout(() => setMessage(''), 4000);
+      loadData();
+    }
+    return res;
+  };
+
+  const handleRequestCorrection = async (id, remarks) => {
+    const res = await requestKycCorrection(id, remarks);
+    if (res.success) {
+      setMessage(`${res.message}. The department has been notified.`);
       setTimeout(() => setMessage(''), 4000);
       loadData();
     }
@@ -217,6 +229,7 @@ const FinanceDashboard = () => {
             return res;
           }}
           onDecide={handleDecide}
+          onRequestCorrection={handleRequestCorrection}
         />
       )}
     </MainLayout>

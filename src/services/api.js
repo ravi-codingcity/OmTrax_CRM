@@ -180,6 +180,11 @@ export const vendorAPI = {
   // KYC review — the backend rejects non-Finance callers with 403
   startKycReview: (id) => api.post(`/vendors/${id}/kyc/review`),
   decideKyc: (id, data) => api.post(`/vendors/${id}/kyc/decision`, data),
+  // Correction / resubmission. Finance sends a KYC back; the owning department
+  // then generates a Correction KYC Link for the details the vendor must fix.
+  requestKycCorrection: (id, data) => api.post(`/vendors/${id}/kyc/correction-request`, data),
+  getCorrectionOptions: (id) => api.get(`/vendors/${id}/kyc/correction`),
+  generateCorrectionLink: (id, data) => api.post(`/vendors/${id}/kyc/correction-link`, data),
   // KYC documents. Cloudinary assets are authenticated, so the backend issues
   // short-lived signed view/download URLs after checking permissions.
   getDocuments: (id) => api.get(`/vendors/${id}/documents`),

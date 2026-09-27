@@ -120,6 +120,15 @@ export const canGenerateKycLink = (user, kycType = 'purchase') => {
   return user?.role === 'purchase_manager';
 };
 
+// Who may generate a Correction KYC Link once Finance sends a KYC back: the
+// department that owns the workflow, and administrators. Finance sends it back
+// but does not generate it. Mirrors canGenerateCorrectionLink in the backend.
+export const canGenerateCorrectionLink = (user, kycType = 'purchase') => {
+  if (isAdminLevel(user)) return true;
+  if (kycType === 'operations') return isOperationsUser(user);
+  return user?.role === 'purchase_manager';
+};
+
 export const canAccessKycType = (user, kycType) => {
   if (isAdminLevel(user) || isFinanceUser(user)) return true;
   if (kycType === 'operations') return isOperationsUser(user);

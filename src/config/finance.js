@@ -40,7 +40,28 @@ export const financeRoleLabel = (role) =>
 
 // ---- KYC status -----------------------------------------------------------
 
-export const KYC_STATUSES = ['not_sent', 'sent', 'submitted', 'under_review', 'approved', 'rejected'];
+export const KYC_STATUSES = [
+  'not_sent', 'sent', 'submitted', 'under_review', 'approved', 'rejected',
+  // Correction / resubmission — Finance sent it back to the owning department
+  'correction_required', 'correction_sent',
+];
+
+// Sent back by Finance and not yet resubmitted by the vendor
+export const isAwaitingCorrection = (vendor) =>
+  ['correction_required', 'correction_sent'].includes(vendor?.kycStatus);
+
+// The correction round in progress, or null (mirrors Vendor.openCorrection)
+export const openCorrection = (vendor) => {
+  const rounds = vendor?.kycCorrections || [];
+  const last = rounds[rounds.length - 1];
+  return last && ['requested', 'link_generated'].includes(last.status) ? last : null;
+};
+
+// The most recent correction round of any status, or null
+export const latestCorrection = (vendor) => {
+  const rounds = vendor?.kycCorrections || [];
+  return rounds.length ? rounds[rounds.length - 1] : null;
+};
 
 export const kycStatusMeta = (status) =>
   ({
@@ -67,6 +88,14 @@ export const kycStatusMeta = (status) =>
     rejected: {
       label: 'Rejected', badge: 'bg-red-100 text-red-700', dot: 'bg-red-500',
       text: 'text-red-700',
+    },
+    correction_required: {
+      label: 'Correction Required', badge: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500',
+      text: 'text-orange-700',
+    },
+    correction_sent: {
+      label: 'Correction Link Sent', badge: 'bg-violet-100 text-violet-700', dot: 'bg-violet-500',
+      text: 'text-violet-700',
     },
   }[status] || { label: status || 'Unknown', badge: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400', text: 'text-gray-600' });
 

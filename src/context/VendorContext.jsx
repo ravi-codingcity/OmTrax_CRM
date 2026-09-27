@@ -170,6 +170,37 @@ export const VendorProvider = ({ children }) => {
     }
   }, []);
 
+  // Finance-only: send a submitted KYC back to its department for correction
+  const requestKycCorrection = useCallback(async (id, remarks) => {
+    try {
+      const res = await vendorAPI.requestKycCorrection(id, { remarks });
+      upsert(res.data.data);
+      return { success: true, data: res.data.data, message: res.data.message };
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || 'Failed to send the KYC back for correction' };
+    }
+  }, []);
+
+  // The details/documents a Correction KYC Link may ask for, plus Finance's remarks
+  const getCorrectionOptions = useCallback(async (id) => {
+    try {
+      const res = await vendorAPI.getCorrectionOptions(id);
+      return { success: true, data: res.data.data };
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || 'Could not load the correction options' };
+    }
+  }, []);
+
+  const generateCorrectionLink = useCallback(async (id, payload) => {
+    try {
+      const res = await vendorAPI.generateCorrectionLink(id, payload);
+      if (res.data.data?.vendor) upsert(res.data.data.vendor);
+      return { success: true, data: res.data.data, message: res.data.message };
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || 'Failed to generate the correction link' };
+    }
+  }, []);
+
   return (
     <VendorContext.Provider
       value={{
@@ -187,6 +218,9 @@ export const VendorProvider = ({ children }) => {
         markKycLinkSent,
         startKycReview,
         decideKyc,
+        requestKycCorrection,
+        getCorrectionOptions,
+        generateCorrectionLink,
       }}
     >
       {children}

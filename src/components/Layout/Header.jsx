@@ -261,6 +261,7 @@ const Header = () => {
         vendor_kyc_approved: { label: '✅ Vendor KYC Approved', color: 'text-green-600' },
         vendor_kyc_rejected: { label: '❌ Vendor KYC Rejected', color: 'text-red-600' },
         vendor_kyc_link_sent: { label: '🔗 KYC Link Shared', color: 'text-indigo-600' },
+        vendor_kyc_correction_requested: { label: '↩️ KYC Sent Back for Correction', color: 'text-orange-600' },
       }[notification.type] || { label: 'Vendor KYC', color: 'text-gray-600' };
       return (
         <>
