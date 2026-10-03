@@ -317,10 +317,21 @@ export const buildPurchaseOrderPdf = (po, { jsPDF, autoTable }) => {
   const figure = (content, bold = false) => ({
     content, styles: { halign: 'center', fontStyle: bold ? 'bold' : 'normal' },
   });
+  // "10", "2.5" — a percentage as written on the order
+  const pct = (n) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  // A discount shows its percentage and amount, then the taxable amount GST is
+  // charged on. Orders saved before percentages hold a fixed amount. With no
+  // discount the block is exactly as before.
+  const discountRows = po.discount
+    ? [
+        [label(po.discountPercent != null ? `Discount @ ${pct(po.discountPercent)}%` : 'Discount'), figure(`- ${amount(po.discount)}`)],
+        [label('Taxable Amount'), figure(amount(Math.max(0, (po.subTotal || 0) - po.discount)))],
+      ]
+    : [];
   const foot = [
     [label('Sub Total'), figure(amount(po.subTotal))],
-    ...(po.discount ? [[label('Discount'), figure(`- ${amount(po.discount)}`)]] : []),
-    [label(`GST @ ${Number(po.taxPercent || 0)}%`), figure(amount(po.taxAmount))],
+    ...discountRows,
+    [label(`GST @ ${pct(po.taxPercent)}%`), figure(amount(po.taxAmount))],
     [label('Grand Total', true), figure(amount(po.totalAmount), true)],
   ];
 

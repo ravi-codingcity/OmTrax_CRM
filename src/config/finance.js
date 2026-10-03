@@ -148,6 +148,48 @@ export const poStatusMeta = (status) =>
     cancelled: { label: 'Cancelled', badge: 'bg-red-100 text-red-700' },
   }[normalisePoStatus(status)] || { label: status || 'Unknown', badge: 'bg-gray-100 text-gray-600' });
 
+// The GST rates a purchase order may be raised at. Mirrors PO_GST_RATES in the
+// backend's PurchaseOrder model, which enforces it.
+export const PO_GST_RATES = [5, 18];
+
+// Filled in on every new purchase order. Suggestions only: the Purchase
+// Manager may edit, reorder or remove any of them, and the PO carries only the
+// terms that are kept.
+export const DEFAULT_PO_TERMS = [
+  'Warehousing charges are included in the quoted cost.',
+  'Second-handling charges are included in the quoted cost.',
+  'Shuttle and long-carry charges are included in the quoted cost.',
+  'HMS services, if required, will be charged extra.',
+  'Delivery charges will be charged extra.',
+];
+
+// "10%", "2.5%"
+export const fmtPercent = (n) =>
+  `${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}%`;
+
+/**
+ * A purchase order's totals, worked out exactly as the backend does on save
+ * (PurchaseOrder pre-save hook), so the preview matches what is stored:
+ *
+ *   discount amount = subtotal x discount %      (or a fixed amount, on orders
+ *                                                 saved before percentages)
+ *   taxable amount  = subtotal - discount amount
+ *   GST amount      = taxable amount x GST %
+ *   grand total     = taxable amount + GST amount
+ */
+export const poTotals = ({ lines = [], taxPercent, discountPercent, fixedDiscount = null }) => {
+  const money = (n) => +(Number(n) || 0).toFixed(2);
+  const subTotal = money(lines.reduce(
+    (s, l) => s + money((Number(l.quantity) || 0) * (Number(l.rate) || 0)), 0
+  ));
+  const discountAmount = fixedDiscount != null
+    ? Number(fixedDiscount) || 0
+    : money(subTotal * (Number(discountPercent) || 0) / 100);
+  const taxable = Math.max(0, subTotal - discountAmount);
+  const taxAmount = money(taxable * (Number(taxPercent) || 0) / 100);
+  return { subTotal, discountAmount, taxable: money(taxable), taxAmount, total: money(taxable + taxAmount) };
+};
+
 // A PO can be corrected while it is a draft or generated. Completed and
 // cancelled orders are closed records. Mirrors the backend rule.
 export const canEditPurchaseOrder = (user, po) =>

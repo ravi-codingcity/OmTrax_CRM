@@ -9,7 +9,7 @@ import PullToRefresh from '../../components/Common/PullToRefresh';
 import PurchaseOrderModal from '../../components/Purchase/PurchaseOrderModal';
 import { exportPurchaseOrderPdf } from '../../utils/pdfExport';
 import {
-  PO_STATUSES, poStatusMeta, normalisePoStatus, inr, fmtDate, fmtDateTime, fmtEditStamp,
+  PO_STATUSES, poStatusMeta, normalisePoStatus, inr, fmtDate, fmtDateTime, fmtEditStamp, fmtPercent,
   canManagePurchaseOrders, canEditPurchaseOrder, isCrmAdmin,
 } from '../../config/finance';
 
@@ -422,10 +422,17 @@ const PurchaseOrders = () => {
               <div className="flex justify-end">
                 <div className="w-full sm:w-56 space-y-1 text-xs">
                   <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{inr(detail.subTotal)}</span></div>
-                  {detail.discount > 0 && <div className="flex justify-between text-gray-600"><span>Discount</span><span>−{inr(detail.discount)}</span></div>}
-                  <div className="flex justify-between text-gray-600"><span>Tax ({detail.taxPercent}%)</span><span>{inr(detail.taxAmount)}</span></div>
+                  <div className="flex justify-between text-gray-600">
+                    {/* Orders saved before percentages hold a fixed amount */}
+                    <span>Discount{detail.discountPercent != null ? ` (${fmtPercent(detail.discountPercent)})` : ''}</span>
+                    <span>−{inr(detail.discount)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>Taxable Amount</span><span>{inr(Math.max(0, (detail.subTotal || 0) - (detail.discount || 0)))}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600"><span>GST ({fmtPercent(detail.taxPercent)})</span><span>{inr(detail.taxAmount)}</span></div>
                   <div className="flex justify-between font-bold text-sm text-gray-900 pt-1 border-t border-gray-200">
-                    <span>Total</span><span>{inr(detail.totalAmount)}</span>
+                    <span>Grand Total</span><span>{inr(detail.totalAmount)}</span>
                   </div>
                 </div>
               </div>

@@ -2,7 +2,9 @@ import { useState, useMemo } from 'react';
 import SearchableSelect from '../Common/SearchableSelect';
 import TermsEditor from './TermsEditor';
 import { UNITS, STORAGE_LOCATIONS } from '../../config/purchase';
-import { inr, kycStatusMeta } from '../../config/finance';
+import {
+  inr, kycStatusMeta, PO_GST_RATES, DEFAULT_PO_TERMS, poTotals, fmtPercent,
+} from '../../config/finance';
 
 const today = () => new Date().toISOString().split('T')[0];
 const emptyLine = () => ({ itemName: '', quantity: '', unit: '', rate: '' });
@@ -23,14 +25,43 @@ const PurchaseOrderModal = ({ mode = 'add', order = null, vendors = [], items = 
   const vendorLocked = !!fromComparison || editingApprovedPo;
   const isDraft = isEdit && order?.status === 'draft';
 
+  // GST: a new order is raised at one of PO_GST_RATES. An order saved before
+  // that rule keeps its rate on offer while being edited, so opening it does
+  // not silently change its tax.
+  const legacyGst = isEdit && order && !PO_GST_RATES.includes(Number(order.taxPercent))
+    ? Number(order.taxPercent) || 0 : null;
+  // A comparison may have been approved at a rate a PO cannot use; the Purchase
+  // Manager then chooses, rather than the form guessing
+  const prefillGstUnavailable = !order && prefill?.taxPercent != null
+    && !PO_GST_RATES.includes(Number(prefill.taxPercent)) ? Number(prefill.taxPercent) : null;
+  const initialGst = () => {
+    if (order) return order.taxPercent ?? '';
+    if (prefill?.taxPercent != null) return prefillGstUnavailable != null ? '' : Number(prefill.taxPercent);
+    return 18;
+  };
+
+  // Discount: entered as a percentage. An order saved before percentages holds
+  // a fixed rupee amount; it is kept unless the percentage is changed.
+  const legacyDiscount = isEdit && order?.discountPercent == null && Number(order?.discount) > 0
+    ? Number(order.discount) : null;
+  const initialDiscountPercent = () => {
+    if (order?.discountPercent != null) return order.discountPercent;
+    if (legacyDiscount != null && Number(order.subTotal) > 0) {
+      return +((legacyDiscount / Number(order.subTotal)) * 100).toFixed(2);
+    }
+    return 0;
+  };
+  const [discountTouched, setDiscountTouched] = useState(false);
+  const keepsFixedDiscount = legacyDiscount != null && !discountTouched;
+
   const [form, setForm] = useState({
     vendor: order?.vendor?._id || order?.vendor || prefill?.vendor || '',
     poDate: order?.poDate ? new Date(order.poDate).toISOString().split('T')[0] : today(),
     expectedDeliveryDate: order?.expectedDeliveryDate ? new Date(order.expectedDeliveryDate).toISOString().split('T')[0] : '',
     deliveryLocation: order?.deliveryLocation || '',
     paymentTerms: order?.paymentTerms || prefill?.paymentTerms || '',
-    taxPercent: order?.taxPercent ?? prefill?.taxPercent ?? 18,
-    discount: order?.discount ?? 0,
+    taxPercent: initialGst(),
+    discountPercent: initialDiscountPercent(),
   });
   const [lines, setLines] = useState(
     prefill?.items?.length && !order
@@ -44,10 +75,12 @@ const PurchaseOrderModal = ({ mode = 'add', order = null, vendors = [], items = 
       : [emptyLine()]
   );
   // Point-wise terms. An older PO may hold a single free-text block, so it is
-  // split into lines the first time it is opened here.
+  // split into lines the first time it is opened here. A new PO starts with
+  // the default terms, each of which can be edited, reordered or removed.
   const [terms, setTerms] = useState(() => {
-    if (order?.terms?.length) return [...order.terms];
-    if (order?.termsAndConditions) {
+    if (!order) return [...DEFAULT_PO_TERMS];
+    if (order.terms?.length) return [...order.terms];
+    if (order.termsAndConditions) {
       return order.termsAndConditions
         .split(/\r?\n/)
         .map((t) => t.replace(/^\s*\d+[.)]\s*/, '').trim())
@@ -77,19 +110,26 @@ const PurchaseOrderModal = ({ mode = 'add', order = null, vendors = [], items = 
   const addLine = () => setLines((p) => [...p, emptyLine()]);
   const removeLine = (idx) => setLines((p) => (p.length === 1 ? p : p.filter((_, i) => i !== idx)));
 
-  // Live preview only — the server recomputes on save
-  const totals = useMemo(() => {
-    const subTotal = lines.reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.rate) || 0), 0);
-    const taxable = Math.max(0, subTotal - (Number(form.discount) || 0));
-    const taxAmount = taxable * (Number(form.taxPercent) || 0) / 100;
-    return { subTotal, taxAmount, total: taxable + taxAmount };
-  }, [lines, form.taxPercent, form.discount]);
+  // Live preview, worked out the same way the server does on save
+  const totals = useMemo(() => poTotals({
+    lines,
+    taxPercent: form.taxPercent,
+    discountPercent: form.discountPercent,
+    fixedDiscount: keepsFixedDiscount ? legacyDiscount : null,
+  }), [lines, form.taxPercent, form.discountPercent, keepsFixedDiscount, legacyDiscount]);
+
+  const gstOptions = legacyGst != null ? [...PO_GST_RATES, legacyGst] : PO_GST_RATES;
 
   const validate = () => {
     const e = {};
     if (!form.vendor) e.vendor = 'Select a vendor';
     const valid = lines.filter((l) => l.itemName.trim() && Number(l.quantity) > 0);
     if (!valid.length) e.items = 'Add at least one item with a quantity greater than zero';
+    if (form.taxPercent === '' || !gstOptions.includes(Number(form.taxPercent))) {
+      e.taxPercent = `Select GST: ${PO_GST_RATES.map((r) => `${r}%`).join(' or ')}`;
+    }
+    const pct = form.discountPercent === '' ? 0 : Number(form.discountPercent);
+    if (!Number.isFinite(pct) || pct < 0 || pct > 100) e.discountPercent = 'Enter a discount between 0 and 100%';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -105,8 +145,9 @@ const PurchaseOrderModal = ({ mode = 'add', order = null, vendors = [], items = 
       expectedDeliveryDate: form.expectedDeliveryDate || undefined,
       deliveryLocation: form.deliveryLocation.trim(),
       paymentTerms: form.paymentTerms.trim(),
-      taxPercent: Number(form.taxPercent) || 0,
-      discount: Number(form.discount) || 0,
+      taxPercent: Number(form.taxPercent),
+      // An older order's fixed discount is left as it is unless changed here
+      ...(keepsFixedDiscount ? {} : { discountPercent: Number(form.discountPercent) || 0 }),
       terms,
       items: lines
         .filter((l) => l.itemName.trim() && Number(l.quantity) > 0)
@@ -167,7 +208,16 @@ const PurchaseOrderModal = ({ mode = 'add', order = null, vendors = [], items = 
             <div className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-2.5 text-xs text-amber-900">
               The approved quotation has different GST rates per item
               ({fromComparison.gstByItem.map((g) => `${g.itemName} ${g.taxPercent}%`).join(', ')}).
-              A purchase order applies one GST rate — {fromComparison.taxPercent}% has been filled in; check it before saving.
+              {prefillGstUnavailable == null
+                ? <> A purchase order applies one GST rate — {fromComparison.taxPercent}% has been filled in; check it before saving.</>
+                : <> A purchase order applies one GST rate — select it below.</>}
+            </div>
+          )}
+
+          {fromComparison && !fromComparison.gstByItem && prefillGstUnavailable != null && (
+            <div className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-2.5 text-xs text-amber-900">
+              The approved quotation is at {fmtPercent(prefillGstUnavailable)} GST, which a purchase order cannot use.
+              Select {PO_GST_RATES.map((r) => `${r}%`).join(' or ')} below.
             </div>
           )}
 
@@ -293,32 +343,75 @@ const PurchaseOrderModal = ({ mode = 'add', order = null, vendors = [], items = 
           </div>
 
           {/* Totals */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
             <div>
-              <label className={labelCls}>Discount (₹)</label>
-              <input type="number" min="0" step="0.01" value={form.discount}
-                onChange={(e) => setField('discount', e.target.value)} className={inputCls} />
+              <label htmlFor="po-discount-percent" className={labelCls}>Discount (%)</label>
+              <div className="relative">
+                <input id="po-discount-percent" type="number" min="0" max="100" step="0.01" value={form.discountPercent}
+                  onChange={(e) => { setDiscountTouched(true); setField('discountPercent', e.target.value); }}
+                  className={`${inputCls} pr-7 ${errors.discountPercent ? 'border-red-300 bg-red-50' : ''}`} />
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">%</span>
+              </div>
+              {errors.discountPercent ? (
+                <p className="text-red-500 text-[11px] mt-0.5">{errors.discountPercent}</p>
+              ) : (
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Discount amount: <strong className="text-gray-700">{inr(totals.discountAmount)}</strong>
+                </p>
+              )}
+              {keepsFixedDiscount && (
+                <p className="text-[11px] text-amber-700 mt-0.5">
+                  This order has a fixed discount of {inr(legacyDiscount)}. It stays unless you change the percentage.
+                </p>
+              )}
             </div>
             <div>
-              <label className={labelCls}>Tax / GST (%)</label>
-              <input type="number" min="0" step="0.01" value={form.taxPercent}
-                onChange={(e) => setField('taxPercent', e.target.value)} className={inputCls} />
+              <label htmlFor="po-gst" className={labelCls}>Tax / GST (%) <span className="text-red-500">*</span></label>
+              <select id="po-gst" value={form.taxPercent} onChange={(e) => setField('taxPercent', e.target.value)}
+                className={`${inputCls} ${errors.taxPercent ? 'border-red-300 bg-red-50' : ''}`}>
+                {form.taxPercent === '' && <option value="">Select GST</option>}
+                {PO_GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
+                {legacyGst != null && (
+                  <option value={legacyGst}>{fmtPercent(legacyGst)} (this order's rate — no longer offered)</option>
+                )}
+              </select>
+              {errors.taxPercent ? (
+                <p className="text-red-500 text-[11px] mt-0.5">{errors.taxPercent}</p>
+              ) : (
+                <p className="text-[11px] text-gray-500 mt-1">
+                  GST amount: <strong className="text-gray-700">{inr(totals.taxAmount)}</strong>
+                </p>
+              )}
             </div>
             <div className="bg-emerald-50 rounded-lg p-3 space-y-0.5">
               <div className="flex justify-between text-[11px] text-gray-600">
                 <span>Subtotal</span><span>{inr(totals.subTotal)}</span>
               </div>
               <div className="flex justify-between text-[11px] text-gray-600">
-                <span>Tax</span><span>{inr(totals.taxAmount)}</span>
+                <span>Discount{keepsFixedDiscount ? '' : ` (${fmtPercent(form.discountPercent)})`}</span>
+                <span>−{inr(totals.discountAmount)}</span>
+              </div>
+              <div className="flex justify-between text-[11px] text-gray-600">
+                <span>Taxable Amount</span><span>{inr(totals.taxable)}</span>
+              </div>
+              <div className="flex justify-between text-[11px] text-gray-600">
+                <span>GST{form.taxPercent === '' ? '' : ` (${fmtPercent(form.taxPercent)})`}</span>
+                <span>{inr(totals.taxAmount)}</span>
               </div>
               <div className="flex justify-between text-sm font-bold text-emerald-800 pt-1 border-t border-emerald-200">
-                <span>Total</span><span>{inr(totals.total)}</span>
+                <span>Grand Total</span><span>{inr(totals.total)}</span>
               </div>
             </div>
           </div>
 
           <div>
             <label className={labelCls}>Terms &amp; Conditions</label>
+            {!isEdit && (
+              <p className="text-[11px] text-gray-500 mb-1.5">
+                The default terms are filled in. Edit, reorder or remove any that do not apply —
+                the PO carries only the terms listed here.
+              </p>
+            )}
             <TermsEditor
               terms={terms}
               onChange={setTerms}
